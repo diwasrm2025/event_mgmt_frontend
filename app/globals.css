@@ -4426,7 +4426,7 @@ tbody td[colspan] {
   align-items: center;
   gap: 16px;
   padding: 16px 32px;
-  background: rgba(var(--accent-rgb), 0.04);
+  background:#EFF0FC;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-bottom: 2px dashed rgba(var(--accent-rgb), 0.16);
