@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -84,14 +85,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {toast && (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      )}
+      <FeedbackNotice message={toast} />
     </AppShell>
   );
 }
@@ -203,7 +197,7 @@ function ProfileTab({ user, onSave }: { user: SessionUser; onSave: (u: SessionUs
           <label htmlFor="s-role">Role</label>
           <input id="s-role" value={user.role} disabled style={{ opacity: 0.6, cursor: "not-allowed", textTransform: "capitalize" }} />
         </div>
-        {error && <div className="form-msg show error">{error}</div>}
+        <FeedbackNotice message={error} icon="error" />
         <div className="settings-form-foot">
           <button type="submit" className="btn btn-accent" disabled={saving} id="save-profile-btn">
             {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faCheck} />}
@@ -317,7 +311,7 @@ function SecurityTab({ onSave }: { onSave: () => void }) {
           />
           {confirm && newPwd !== confirm && <div className="hint" style={{ color: "var(--danger)" }}>Passwords do not match.</div>}
         </div>
-        {error && <div className="form-msg show error">{error}</div>}
+        <FeedbackNotice message={error} icon="error" />
         <div className="settings-form-foot">
           <button type="submit" className="btn btn-accent" disabled={saving} id="change-password-btn">
             {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faLock} />}

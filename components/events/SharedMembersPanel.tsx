@@ -31,7 +31,7 @@ import {
   type SharedMember,
 } from "@/lib/rbac";
 
-const CAPABILITIES: EventCapability[] = ["VIEW", "ATTENDEE", "EDIT"];
+const CAPABILITIES: EventCapability[] = ["VIEW", "EDIT", "PAYMENT_APPROVE", "ATTENDEE"];
 
 function initialsOf(name: string) {
   return (name || "?")

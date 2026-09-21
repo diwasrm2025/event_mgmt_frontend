@@ -2,12 +2,12 @@ export type ThemeMode = "light" | "dark";
 export type AccentName = "violet" | "emerald" | "amber" | "rose" | "sky" | "indigo" | "custom";
 
 export const ACCENT_OPTIONS: Array<{ value: AccentName; label: string; swatch: string; palette: [string, string, string, string] }> = [
-  { value: "violet", label: "Violet Pulse", swatch: "#7c5cff", palette: ["#7c5cff", "#a78bfa", "#ec4899", "#38bdf8"] },
-  { value: "emerald", label: "Emerald Mint", swatch: "#10b981", palette: ["#10b981", "#34d399", "#06b6d4", "#6366f1"] },
-  { value: "amber", label: "Amber Sunset", swatch: "#f59e0b", palette: ["#f59e0b", "#fbbf24", "#f97316", "#ef4444"] },
-  { value: "rose", label: "Neon Rose", swatch: "#f43f5e", palette: ["#f43f5e", "#fb7185", "#a855f7", "#6366f1"] },
-  { value: "sky", label: "Ocean Sky", swatch: "#06b6d4", palette: ["#06b6d4", "#38bdf8", "#3b82f6", "#8b5cf6"] },
-  { value: "indigo", label: "Indigo Cyber", swatch: "#6366f1", palette: ["#6366f1", "#818cf8", "#d946ef", "#06b6d4"] },
+  { value: "violet", label: "Violet", swatch: "#7c5cff", palette: ["#7c5cff", "#a78bfa", "#ec4899", "#38bdf8"] },
+  { value: "emerald", label: "Emerald", swatch: "#10b981", palette: ["#10b981", "#34d399", "#06b6d4", "#6366f1"] },
+  { value: "amber", label: "Amber", swatch: "#f59e0b", palette: ["#f59e0b", "#fbbf24", "#f97316", "#ef4444"] },
+  { value: "rose", label: "Rose", swatch: "#f43f5e", palette: ["#f43f5e", "#fb7185", "#a855f7", "#6366f1"] },
+  { value: "sky", label: "Ocean", swatch: "#06b6d4", palette: ["#06b6d4", "#38bdf8", "#3b82f6", "#8b5cf6"] },
+  { value: "indigo", label: "Indigo", swatch: "#6366f1", palette: ["#6366f1", "#818cf8", "#d946ef", "#06b6d4"] },
 ];
 
 export const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [

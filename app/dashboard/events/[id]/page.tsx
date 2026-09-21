@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -27,14 +28,7 @@ export default function ManageEventPage() {
       <AppShell title="Manage event" subtitle="Edit any step — the booking link stays the same once it's published.">
         <EventWizard eventId={params.id} onToast={setToast} />
       </AppShell>
-      {toast ? (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      ) : null}
+      <FeedbackNotice message={toast} />
     </>
   );
 }

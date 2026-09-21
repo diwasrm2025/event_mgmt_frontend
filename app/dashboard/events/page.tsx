@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -39,14 +40,7 @@ export default function EventsPage() {
       >
         <EventsView onToast={setToast} />
       </AppShell>
-      {toast ? (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      ) : null}
+      <FeedbackNotice message={toast} />
     </>
   );
 }

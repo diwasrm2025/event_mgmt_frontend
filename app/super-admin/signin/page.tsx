@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -9,8 +10,8 @@ import { signIn, getSession } from "@/lib/auth";
 
 export default function SuperAdminSignInPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("superadmin@pulseframe.app");
-  const [password, setPassword] = useState("SuperAdminPass2026!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
@@ -36,6 +37,10 @@ export default function SuperAdminSignInPage() {
       return;
     }
 
+    if (!getSession()?.permissions.includes("events:manage_all")) {
+      setMessage("This account does not have Super Admin access. Please use the organizer sign-in page.");
+      setMessageType("error"); return;
+    }
     setMessage("Super Admin authenticated! Redirecting...");
     setMessageType("success");
     window.setTimeout(() => router.push("/super-admin"), 350);
@@ -45,7 +50,7 @@ export default function SuperAdminSignInPage() {
     <AuthFormShell
       eyebrow="Master Administration Portal"
       title="Super Admin Sign In"
-      subtitle="Sign in with your Super Admin credentials configured in .env"
+      subtitle="Sign in with your administrator account."
       footer={<Link href="/signin">Return to regular organizer login</Link>}
     >
       <form onSubmit={handleSubmit}>
@@ -54,6 +59,7 @@ export default function SuperAdminSignInPage() {
           <input
             id="email"
             type="email"
+            placeholder="Enter your administrator email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -66,6 +72,7 @@ export default function SuperAdminSignInPage() {
           <input
             id="password"
             type="password"
+            placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -73,15 +80,9 @@ export default function SuperAdminSignInPage() {
           />
         </div>
 
-        <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(255, 255, 255, 0.04)", borderRadius: 8, fontSize: "0.85rem", color: "var(--muted)" }}>
-          <strong style={{ color: "var(--text)" }}>Default .env Credentials:</strong>
-          <br />
-          Email: <code style={{ color: "#a5f3fc" }}>superadmin@pulseframe.app</code>
-          <br />
-          Password: <code style={{ color: "#a5f3fc" }}>SuperAdminPass2026!</code>
-        </div>
 
-        {message ? <div className={`form-msg show ${messageType}`} style={{ marginTop: 14 }}>{message}</div> : null}
+
+        <FeedbackNotice message={message} icon={messageType || "info"} />
 
         <button type="submit" className="btn btn-accent" style={{ width: "100%", marginTop: 20 }} disabled={pending}>
           {pending ? (

@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -99,7 +100,7 @@ export default function SignUpPage() {
         </div>
         <p className="hint">Use at least 8 characters.</p>
 
-        {message ? <div className={`form-msg show ${messageType}`} style={{ marginTop: 14 }}>{message}</div> : null}
+        <FeedbackNotice message={message} icon={messageType || "info"} />
 
         <button type="submit" className="btn btn-accent" style={{ width: "100%", marginTop: 20 }} disabled={pending}>
           {pending ? (

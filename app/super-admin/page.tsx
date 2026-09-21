@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -149,7 +150,7 @@ export default function SuperAdminDashboardPage() {
         </div>
       </div>
 
-      {error ? <div className="form-msg show error" style={{ marginBottom: "16px" }}>{error}</div> : null}
+      <FeedbackNotice message={error} icon="error" />
 
       {loading ? (
         <div className="empty-state">Loading Super Admin Data…</div>
@@ -161,14 +162,7 @@ export default function SuperAdminDashboardPage() {
         <UsersAndRolesTab users={users} roles={roles} myId={myId} onAssignRole={handleAssignRole} onChanged={loadAll} onToast={setToast} />
       )}
 
-      {toast ? (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      ) : null}
+      <FeedbackNotice message={toast} />
     </AppShell>
   );
 }
@@ -682,8 +676,6 @@ function PaymentAccountTab({ onToast }: { onToast: (msg: string) => void }) {
   const [accountNumber, setAccountNumber] = useState("50100293848192");
   const [ifscCode, setIfscCode] = useState("HDFC0000128");
   const [upiId, setUpiId] = useState("pulseframe@hdfcbank");
-  const [razorpayKey, setRazorpayKey] = useState("rzp_live_8F9aB3c4d5e6f7");
-  const [razorpaySecret, setRazorpaySecret] = useState("••••••••••••••••••••");
   const [currency, setCurrency] = useState("INR");
   const [saving, setSaving] = useState(false);
 
@@ -702,7 +694,7 @@ function PaymentAccountTab({ onToast }: { onToast: (msg: string) => void }) {
         <div>
           <h3>💳 Payment Receiving Account (Super Admin)</h3>
           <p className="hint" style={{ margin: 0 }}>
-            Configure the bank account, UPI ID, and payment gateway credentials for receiving platform revenues and event ticket sales.
+            Configure the bank account and UPI ID for receiving platform revenues and event ticket sales.
           </p>
         </div>
       </div>
@@ -711,26 +703,26 @@ function PaymentAccountTab({ onToast }: { onToast: (msg: string) => void }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
             <div className="field">
               <label htmlFor="acc-name">Account Holder Name</label>
-              <input id="acc-name" value={accountName} onChange={(e) => setAccountName(e.target.value)} required />
+              <input placeholder="Enter the account holder name" id="acc-name" value={accountName} onChange={(e) => setAccountName(e.target.value)} required />
             </div>
             <div className="field">
               <label htmlFor="bank-name">Bank Name</label>
-              <input id="bank-name" value={bankName} onChange={(e) => setBankName(e.target.value)} required />
+              <input placeholder="Enter the receiving bank name" id="bank-name" value={bankName} onChange={(e) => setBankName(e.target.value)} required />
             </div>
             <div className="field">
               <label htmlFor="acc-num">Bank Account Number</label>
-              <input id="acc-num" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} required />
+              <input placeholder="Enter the bank account number" inputMode="numeric" id="acc-num" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} required />
             </div>
             <div className="field">
               <label htmlFor="ifsc">IFSC Code / Branch</label>
-              <input id="ifsc" value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} required />
+              <input placeholder="For example: ABCD0123456" id="ifsc" value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} required />
             </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
             <div className="field">
               <label htmlFor="upi-id">Receiving UPI ID</label>
-              <input id="upi-id" value={upiId} onChange={(e) => setUpiId(e.target.value)} required />
+              <input placeholder="For example: events@bank" id="upi-id" value={upiId} onChange={(e) => setUpiId(e.target.value)} required />
             </div>
             <div className="field">
               <label htmlFor="payout-curr">Default Payout Currency</label>
@@ -740,16 +732,7 @@ function PaymentAccountTab({ onToast }: { onToast: (msg: string) => void }) {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-            <div className="field">
-              <label htmlFor="rzp-key">Razorpay Key ID</label>
-              <input id="rzp-key" value={razorpayKey} onChange={(e) => setRazorpayKey(e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="rzp-secret">Razorpay Key Secret</label>
-              <input id="rzp-secret" type="password" value={razorpaySecret} onChange={(e) => setRazorpaySecret(e.target.value)} />
-            </div>
-          </div>
+
 
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button type="submit" className="btn btn-primary" disabled={saving}>

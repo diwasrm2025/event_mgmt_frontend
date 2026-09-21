@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -94,7 +95,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {error ? <div className="form-msg show error" style={{ marginBottom: "16px" }}>{error}</div> : null}
+      <FeedbackNotice message={error} icon="error" />
 
       {loading ? (
         <div className="empty-state">Loading…</div>
@@ -104,7 +105,7 @@ export default function AdminPage() {
         <RolesTab roles={roles} onChanged={load} onToast={setToast} />
       )}
 
-      {toast ? <div className="toast-wrap"><div className="toast"><span className="tdot" /><span>{toast}</span></div></div> : null}
+      <FeedbackNotice message={toast} />
     </AppShell>
   );
 }

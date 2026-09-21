@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
@@ -162,14 +163,7 @@ export default function DashboardPage() {
       <AppShell title="Dashboard" subtitle="Track bookings, revenue, and event health in one place." actions={<Link href="/dashboard/events" className="btn btn-accent btn-sm">New event</Link>}>
         <DashboardView events={events} stats={stats} activity={activity} onToast={setToast} />
       </AppShell>
-      {toast ? (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      ) : null}
+      <FeedbackNotice message={toast} />
       {showCreatePrompt ? (
         <div className="dashboard-create-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-create-title">
           <div className="dashboard-create-modal">

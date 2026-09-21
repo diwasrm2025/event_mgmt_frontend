@@ -19,11 +19,6 @@ export default function RootLayout({
         <Script id="theme-bootstrap" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeBootstrapScript() }} />
       </head>
       <body className="min-h-full flex flex-col">
-        <Script
-          id="razorpay-checkout"
-          src="https://checkout.razorpay.com/v1/checkout.js"
-          strategy="afterInteractive"
-        />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

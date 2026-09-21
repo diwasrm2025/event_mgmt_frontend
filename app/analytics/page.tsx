@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -75,14 +76,7 @@ export default function AnalyticsPage() {
       <AppShell title="Analytics" subtitle="See bookings, venue load, and category mix at a glance." actions={null} rightRail={rightRail}>
         <AnalyticsView events={events} />
       </AppShell>
-      {toast ? (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      ) : null}
+      <FeedbackNotice message={toast} />
     </>
   );
 }

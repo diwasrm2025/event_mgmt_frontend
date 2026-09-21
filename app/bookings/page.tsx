@@ -1,4 +1,5 @@
 "use client";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -75,14 +76,7 @@ export default function BookingsPage() {
       <AppShell title="Bookings" subtitle="Monitor bookings and capacity across the full event portfolio." rightRail={rightRail}>
         <BookingsView events={events} />
       </AppShell>
-      {toast ? (
-        <div className="toast-wrap">
-          <div className="toast">
-            <span className="tdot" />
-            <span>{toast}</span>
-          </div>
-        </div>
-      ) : null}
+      <FeedbackNotice message={toast} />
     </>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Swal } from "@/lib/swal";
@@ -53,6 +55,7 @@ import {
   type EventStatus,
   type FieldType,
 } from "@/lib/events";
+import { EventBannerSlider } from "./EventBannerSlider";
 import { SharedMembersPanel } from "./SharedMembersPanel";
 import { EventDashboardSummary } from "./EventDashboardSummary";
 
@@ -295,7 +298,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         host: info.host.trim() || "Organizer",
         wizardStep: 3,
       });
-      if (updated) setEvent(updated);
+      if (updated) setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
       advance(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save event info.");
@@ -328,7 +331,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         price: Number(capacity.price),
         wizardStep: 4,
       });
-      if (updated) setEvent(updated);
+      if (updated) setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
       advance(4);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save capacity.");
@@ -348,7 +351,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     setUploadingBanner(true);
     try {
       const updated = await uploadEventBanner(event.id, file);
-      setEvent(updated);
+      setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
       onToast("Banner added.");
     } catch (err) {
       onToast(err instanceof Error ? err.message : "Could not upload that image.");
@@ -359,9 +362,10 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const handleRemoveBanner = async (url: string) => {
     if (!event) return;
+    if (!(await Swal.confirm("Remove this event photo?", "This photo will no longer appear on the event page.", "Remove photo")).isConfirmed) return;
     try {
       const updated = await removeEventBanner(event.id, url);
-      setEvent(updated);
+      setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
     } catch {
       onToast("Could not remove that banner.");
     }
@@ -382,7 +386,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
           .filter(Boolean),
         wizardStep: 5,
       });
-      if (updated) setEvent(updated);
+      if (updated) setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
       advance(5);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save these details.");
@@ -433,6 +437,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const deleteField = async (field: EventFormFieldItem) => {
     if (!event) return;
+    if (!(await Swal.confirm("Remove this registration field?", field.label, "Remove field")).isConfirmed) return;
     try {
       await removeEventField(event.id, field.id);
       setFields((current) => current.filter((item) => item.id !== field.id));
@@ -508,6 +513,15 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     );
   }
 
+  if (event && event.isOwner === false && !event.sharedPermissions?.includes("EDIT")) {
+    return <section className="panel"><div className="panel-body">
+      <EventBannerSlider banners={event.banners || []} title={event.title} />
+      <h1>{event.title}</h1><p>{event.description}</p>
+      <dl><dt>Date</dt><dd>{event.date} {event.time}</dd><dt>Venue</dt><dd>{event.venue || "Online event"}</dd><dt>Host</dt><dd>{event.host}</dd><dt>Registration fee</dt><dd>{event.price}</dd></dl>
+      <Link className="btn btn-accent" href={`/dashboard/events/${event.id}/attendees`}>View attendees</Link>
+    </div></section>;
+  }
+
   const FieldErr = ({ name }: { name: string }) =>
     stepErrors[name] ? <div className="field-error">{stepErrors[name]}</div> : null;
 
@@ -564,7 +578,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
       {/* ── RIGHT CONTENT AREA (70%) ────────────────────────── */}
       <div className="wizard-content">
-        {error ? <div className="form-msg show error" style={{ marginBottom: 16 }}>{error}</div> : null}
+        <FeedbackNotice message={error} icon="error" />
 
         {/* ── Step 1: Event Info ─────────────────────────────── */}
         {step === 1 ? (
@@ -1252,7 +1266,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
             )}
 
             <EventDashboardSummary eventId={event.id} />
-            <SharedMembersPanel eventId={event.id} onToast={onToast} />
+            {event.isOwner !== false && <SharedMembersPanel eventId={event.id} onToast={onToast} />}
 
             <div className="wizard-foot">
               <button className="btn btn-ghost" type="button" onClick={() => goToStep(5)}>
@@ -1262,7 +1276,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 <button className="btn btn-ghost" type="button" onClick={() => router.push("/dashboard/events")}>
                   Save &amp; exit
                 </button>
-                <button className="btn btn-danger-outline" type="button" onClick={handleDelete}>
+                <button hidden={event.isOwner === false} className="btn btn-danger-outline" type="button" onClick={handleDelete}>
                   Delete event
                 </button>
                 <button className="btn btn-accent" type="button" onClick={publish} disabled={saving}>

@@ -1,7 +1,16 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Image from "next/image";
 import { PublicTopBar } from "@/components/layout/PublicTopBar";
-
+import logo from "../../app/images/logo.png";
+import logo1 from "../../app/images/1.png";
+import logo2 from "../../app/images/2.png";
+import logo3 from "../../app/images/3.png";
+import logo4 from "../../app/images/4.png";
+import logo5 from "../../app/images/5.png";
+import logo6 from "../../app/images/6.png";
+import logo7 from "../../app/images/7.jpg";
+import logo8 from "../../app/images/8.png";
+import logo9 from "../../app/images/9.png";
 type AuthFormShellProps = {
   eyebrow: string;
   title: string;
@@ -30,46 +39,25 @@ export function AuthFormShell({
         <div className="auth-brand">
           <div className="brand-mark">
             <span className="dot" />
-            Pulseframe
+            SRM Group Of Institutions
           </div>
 
-          <div className="auth-ticket">
-            <div>
-              <p className="mono" style={{ fontSize: "11px", letterSpacing: ".14em", textTransform: "uppercase", opacity: 0.85 }}>
-                {brandAccent}
-              </p>
-              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.35rem", marginTop: "10px" }}>Autumn Sound Sessions</h3>
-              <p style={{ fontSize: "13px", opacity: 0.88, marginTop: "6px" }}>Riverside Amphitheatre . Gate 3</p>
-              <p className="mono" style={{ fontSize: "12px", marginTop: "16px", opacity: 0.72 }}>
-                SEAT GA . ROW A
-              </p>
+          <div className="auth-logo-grid">
+            <div className="auth-logo-tile auth-logo-main">
+              <Image src={logo} alt="SRM Group of Institutions logo" fill sizes="(max-width: 920px) 80vw, 420px" />
             </div>
-            <div className="side">
-              <span>AUG 14 . 7:00 PM</span>
-            </div>
+            {[logo1, logo2, logo3, logo4, logo5,logo6,logo7, logo8,logo9].map((image, index) => (
+              <div className="auth-logo-tile" key={index}>
+                <Image src={image} alt={`Institution logo ${index + 1}`} fill sizes="(max-width: 920px) 24vw, 140px" />
+              </div>
+            ))}
           </div>
 
-          <div className="auth-highlights">
-            <span className="auth-pill">
-              <span className="auth-pill-dot" />
-              Live insights
-            </span>
-            <span className="auth-pill">
-              <span className="auth-pill-dot" />
-              Fast check-ins
-            </span>
-            <span className="auth-pill">
-              <span className="auth-pill-dot" />
-              Team ready
-            </span>
-          </div>
-
+          
           <div className="brand-copy">
             <h2>{brandTitle}</h2>
-            <p style={{ marginTop: "10px" }}>{brandText}</p>
           </div>
 
-          <footer>(c) 2026 Pulseframe. All events accounted for.</footer>
         </div>
 
         <div className="auth-form-wrap">

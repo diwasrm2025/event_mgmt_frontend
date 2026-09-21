@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getSession, initials, logOut, refreshSession, type SessionUser } from "@/lib/auth";
-import { Swal } from "@/lib/swal";
+import { Swal, notify } from "@/lib/swal";
 import { NotificationBell } from "./NotificationBell";
 import { ACCENT_OPTIONS, type ThemeMode } from "@/lib/themePrefs";
 import { useTheme } from "@/components/providers/ThemeProvider";
@@ -195,25 +195,7 @@ export function AppShell({
   }, [accentMenuOpen]);
 
   useEffect(() => {
-    const handleToast = (message: string) => {
-      let wrap = document.querySelector(".toast-wrap");
-      if (!wrap) {
-        wrap = document.createElement("div");
-        wrap.className = "toast-wrap";
-        document.body.appendChild(wrap);
-      }
-
-      const toast = document.createElement("div");
-      toast.className = "toast";
-      toast.innerHTML = '<span class="tdot"></span><span>' + message + "</span>";
-      wrap.appendChild(toast);
-
-      window.setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transition = "opacity 0.2s ease";
-        window.setTimeout(() => toast.remove(), 220);
-      }, 2400);
-    };
+    const handleToast = (message: string) => { void notify(message); };
 
     window.showToast = handleToast;
     return () => {
@@ -456,9 +438,9 @@ export function AppShell({
 
           {/* Content */}
           <div className="content">
-            <div className="layout-grid">
+            <div className={`layout-grid ${pathname === "/dashboard" ? "" : "layout-grid-full"}`}>
               <section className="content-stage">{children}</section>
-              <aside className="content-rail">
+              {pathname === "/dashboard" && <aside className="content-rail">
                 {rightRail || (
                   <DynamicRightRail
                     user={profile}
@@ -468,7 +450,7 @@ export function AppShell({
                     onSettings={() => router.push("/dashboard/settings")}
                   />
                 )}
-              </aside>
+              </aside>}
             </div>
           </div>
         </main>

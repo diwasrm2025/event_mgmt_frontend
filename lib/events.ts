@@ -202,23 +202,14 @@ export async function listPublicEvents(filters: { search?: string; category?: st
   });
 }
 
-export type PaymentMethod = "razorpay" | "offline" | "free";
+export type PaymentMethod = "qr" | "offline" | "free";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  razorpay: "Razorpay",
+  qr: "QR payment",
   offline: "Pay offline",
   free: "Free",
 };
-
-/** Presentation + future-gateway metadata for each payment option, kept in
- * one place so the checkout UI, receipts, and admin views never hardcode a
- * method's label/color/icon separately. `gatewayHint` is a placeholder for
- * whichever real processor (Razorpay/Stripe/etc.) ends up wired to this
- * method later — nothing here performs real payment processing. */
-/* Legacy payment-provider metadata removed: Razorpay owns the payment UI. */
-/*
-]; */
 
 export type BookingPayload = {
   name: string;
@@ -226,6 +217,8 @@ export type BookingPayload = {
   phone?: string;
   responses?: Record<string, unknown>;
   paymentMethod?: PaymentMethod;
+  transactionId?: string;
+  paymentProof?: string;
 };
 
 export interface BookingItem {
@@ -235,7 +228,7 @@ export interface BookingItem {
   phone: string;
   seats: number;
   responses: Record<string, unknown>;
-  status: "confirmed" | "cancelled";
+  status: "pending" | "confirmed" | "cancelled";
   registrationStatus: "pending" | "approved" | "rejected";
   checkedIn: boolean;
   checkedInAt: string | null;
@@ -246,80 +239,19 @@ export interface BookingItem {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   transactionId: string | null;
+  paymentProof: string | null;
+  paymentAccessToken: string;
+  rejectionReason: string | null;
   paidAt: string | null;
 }
 
-/** Checkout step 1 — places the order. Free events come back already
- * `paid`; priced ones come back `pending` until payForBooking() below
- * confirms the (simulated) charge. */
+/** Submit registration and payment evidence for administrator review. */
 export async function createBooking(slug: string, data: BookingPayload): Promise<BookingItem> {
   return apiRequest<BookingItem>(`/public/events/${encodeURIComponent(slug)}/bookings`, {
     method: "POST",
     body: data,
     auth: true,
   });
-}
-
-/** Checkout step 2 — simulated payment gateway confirmation for a pending order. */
-export type RazorpayOrder = {
-  orderId: string;
-  amount: number;
-  currency: string;
-  keyId: string;
-};
-
-export async function createPaymentOrder(
-  bookingId: string,
-): Promise<RazorpayOrder> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/payments/create-order`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        bookingId,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-
-    throw new Error(
-      error?.message || "Could not create Razorpay order.",
-    );
-  }
-
-  return response.json();
-}
-export async function verifyPayment(payload: {
-  bookingId: string;
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature: string;
-}): Promise<BookingItem> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/payments/verify`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-
-    throw new Error(
-      error?.message || "Payment verification failed.",
-    );
-  }
-
-  return response.json();
 }
 
 export async function getMyBookings(): Promise<BookingItem[]> {
@@ -340,12 +272,10 @@ export interface RestrictedBookingItem {
   checkedIn: boolean;
 }
 
-export async function getEventBookings(
-  eventId: string,
-): Promise<{ restricted: boolean; items: BookingItem[] | RestrictedBookingItem[] }> {
-  return apiRequest<{ restricted: boolean; items: BookingItem[] | RestrictedBookingItem[] }>(
-    `/bookings/event/${encodeURIComponent(eventId)}`,
-  );
+export type RosterAccess = { canApprovePayment: boolean; canCheckIn: boolean };
+export type RosterBooking = Pick<BookingItem, "id" | "name" | "email" | "phone" | "seats" | "amount" | "createdAt" | "paymentMethod" | "paymentStatus" | "registrationStatus" | "status" | "responses"> & Partial<Pick<BookingItem, "paymentProof" | "transactionId" | "rejectionReason" | "paidAt" | "checkedIn" | "checkedInAt">>;
+export function getEventBookings(eventId: string) {
+  return apiRequest<{ capabilities: RosterAccess; items: RosterBooking[] }>(`/bookings/event/${encodeURIComponent(eventId)}`);
 }
 
 // ---------------------------------------------------------------------------

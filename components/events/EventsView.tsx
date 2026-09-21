@@ -130,8 +130,8 @@ export function EventsView({ onToast }: EventsViewProps) {
       onToast("Finish the wizard to generate this event's booking link.");
       return;
     }
-    await navigator.clipboard.writeText(url);
-    onToast("Booking link copied.");
+    try { await navigator.clipboard.writeText(url); onToast("Booking link copied."); }
+    catch { onToast("Could not copy the link. Open the booking page and copy its address."); }
   };
 
   // Determine permissions for each event
@@ -154,7 +154,7 @@ export function EventsView({ onToast }: EventsViewProps) {
   function canViewAttendees(event: EventItem) {
     if (isSuperAdmin) return true;
     if (event.isOwner !== false) return true;
-    return (event.sharedPermissions?.includes("ATTENDEE") || event.sharedPermissions?.includes("EDIT")) ?? false;
+    return Boolean(event.sharedPermissions?.length);
   }
 
   const STATUS_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {

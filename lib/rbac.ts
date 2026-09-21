@@ -27,17 +27,19 @@ export type PersonSummary = {
 };
 
 /** A single event-sharing capability. Grants hold any combination. */
-export type EventCapability = "VIEW" | "ATTENDEE" | "EDIT";
+export type EventCapability = "VIEW" | "ATTENDEE" | "EDIT" | "PAYMENT_APPROVE";
 
 export const EVENT_CAPABILITY_LABELS: Record<EventCapability, string> = {
   VIEW: "View",
   ATTENDEE: "Attendee Management",
   EDIT: "Edit",
+  PAYMENT_APPROVE: "Payment Approve",
 };
 
 export const EVENT_CAPABILITY_DESCRIPTIONS: Record<EventCapability, string> = {
-  VIEW: "Can view event details. Cannot modify anything.",
-  ATTENDEE: "Can manage registrations, approve/reject, check attendees in/out, and export the list.",
+  VIEW: "View event details and the attendee list. No editing or management actions.",
+  ATTENDEE: "Manage attendee check-in and check-out. Cannot approve payments.",
+  PAYMENT_APPROVE: "Review payment screenshots and transaction IDs, then approve or reject payments.",
   EDIT: "Can edit event details, images, and schedule. Cannot delete the event.",
 };
 
@@ -178,8 +180,8 @@ export function toggleAttendeeCheckIn(eventId: string, bookingId: string) {
   return apiRequest(`/bookings/event/${eventId}/${bookingId}/check-in`, { method: "PATCH" });
 }
 
-export function updateRegistrationStatus(eventId: string, bookingId: string, status: "pending" | "approved" | "rejected") {
-  return apiRequest(`/bookings/event/${eventId}/${bookingId}/registration-status`, { method: "PATCH", body: { status } });
+export function updateRegistrationStatus(eventId: string, bookingId: string, status: "pending" | "approved" | "rejected", reason?: string) {
+  return apiRequest<Pick<import("./events").BookingItem, "id" | "paymentStatus" | "registrationStatus" | "rejectionReason" | "paidAt" | "status">>(`/bookings/event/${eventId}/${bookingId}/registration-status`, { method: "PATCH", body: { status, reason } });
 }
 
 // --- Notifications ---------------------------------------------------------
