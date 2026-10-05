@@ -202,13 +202,15 @@ export async function listPublicEvents(filters: { search?: string; category?: st
   });
 }
 
-export type PaymentMethod = "qr" | "offline" | "free";
+export type PaymentMethod = "qr" | "offline" | "free" | "sbiepay";
+
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   qr: "QR payment",
   offline: "Pay offline",
   free: "Free",
+  sbiepay: "SBI ePay",
 };
 
 export type BookingPayload = {
@@ -246,12 +248,23 @@ export interface BookingItem {
 }
 
 /** Submit registration and payment evidence for administrator review. */
-export async function createBooking(slug: string, data: BookingPayload): Promise<BookingItem> {
-  return apiRequest<BookingItem>(`/public/events/${encodeURIComponent(slug)}/bookings`, {
-    method: "POST",
-    body: data,
-    auth: true,
-  });
+export type CreateBookingResponse = {
+  booking: BookingItem;
+  transactionUrl?: string;
+};
+
+export async function createBooking(
+  slug: string,
+  data: BookingPayload
+): Promise<CreateBookingResponse> {
+  return apiRequest<CreateBookingResponse>(
+    `/public/events/${encodeURIComponent(slug)}/bookings`,
+    {
+      method: "POST",
+      body: data,
+      auth: true,
+    }
+  );
 }
 
 export async function getMyBookings(): Promise<BookingItem[]> {
