@@ -5,6 +5,7 @@ import { apiRequest, apiUpload } from "./api";
 export type EventStatus = "published" | "draft" | "sold-out" | "completed";
 export type EventCategory = "Music" | "Conference" | "Workshop" | "Sports" | "Festival" | "Community";
 export type EventMode = "online" | "offline";
+export type EventType = "free" | "paid";
 export type FieldType = "text" | "email" | "phone" | "number" | "date" | "textarea" | "select" | "checkbox" | "radio";
 
 export interface EventFormFieldItem {
@@ -30,6 +31,7 @@ export interface EventItem {
   venue: string;
   capacity: number;
   attendees: number;
+  eventType: EventType;
   price: number;
   status: EventStatus;
   description: string;
@@ -79,6 +81,7 @@ export type EventPayload = Partial<{
   venue: string;
   capacity: number;
   attendees: number;
+  eventType: EventType;
   price: number;
   status: EventStatus;
   description: string;
@@ -115,12 +118,8 @@ export async function createEvent(data: EventPayload): Promise<EventItem> {
 
 /** PATCHes one wizard step's worth of fields onto an existing draft (or
  * makes a quick edit after the event is already published). */
-export async function updateEvent(id: string, data: Partial<EventPayload>): Promise<EventItem | null> {
-  try {
-    return await apiRequest<EventItem>(`/events/${id}`, { method: "PATCH", body: data });
-  } catch {
-    return null;
-  }
+export async function updateEvent(id: string, data: Partial<EventPayload>): Promise<EventItem> {
+  return apiRequest<EventItem>(`/events/${id}`, { method: "PATCH", body: data });
 }
 
 /** Final wizard step: generates the slug/unique URL the first time it's
@@ -206,6 +205,13 @@ export type PaymentMethod = "qr" | "offline" | "free" | "sbiepay";
 
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pending: "Payment Pending",
+  paid: "Payment Completed",
+  failed: "Payment Failed",
+  refunded: "Payment Refunded",
+};
+
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   qr: "QR payment",
   offline: "Pay offline",
@@ -251,13 +257,14 @@ export interface BookingItem {
 export type CreateBookingResponse = {
   booking: BookingItem;
   transactionUrl?: string;
+  paymentInitiationPending?: boolean;
 };
 
 export async function createBooking(
   slug: string,
   data: BookingPayload
 ): Promise<CreateBookingResponse> {
-  return apiRequest<CreateBookingResponse>(
+  const result = await apiRequest<CreateBookingResponse | BookingItem>(
     `/public/events/${encodeURIComponent(slug)}/bookings`,
     {
       method: "POST",
@@ -265,6 +272,7 @@ export async function createBooking(
       auth: true,
     }
   );
+  return "booking" in result ? result : { booking: result };
 }
 
 export async function getMyBookings(): Promise<BookingItem[]> {

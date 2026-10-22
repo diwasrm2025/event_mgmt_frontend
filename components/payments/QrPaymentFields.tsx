@@ -4,7 +4,9 @@ import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 import paymentQr from "@/app/images/payment_qr.jpeg";
 import { useState } from "react";
 
-export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof, onReady }: {
+export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof, onReady, showQr = true, showEvidence = true }: {
+  showQr?: boolean;
+  showEvidence?: boolean;
   transactionId: string;
   onTransactionId: (value: string) => void;
   proof: string;
@@ -25,9 +27,12 @@ export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof
     reader.readAsDataURL(file);
   }
   return <div className="qr-payment-fields">
+    {showQr && <>
     <p className="hint">Scan using your payment app and pay the registration amount shown below.</p>
     {qrError ? <p role="alert" className="form-msg show error">The payment QR is currently unavailable. Please contact the organizer.</p> :
       <img className="payment-qr-image" src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || paymentQr.src} alt="Scan to pay the event organizer" onLoad={() => onReady(true)} onError={() => { setQrError(true); onReady(false); }} />}
+    </>}
+    {showEvidence && <>
     <label className="field">Transaction ID / UTR (required)
       <input required minLength={6} maxLength={100} pattern="[A-Za-z0-9-]{6,100}" value={transactionId} onChange={(e) => onTransactionId(e.target.value)} placeholder="Enter your payment transaction ID" />
     </label>
@@ -37,5 +42,6 @@ export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof
     </label>
     <FeedbackNotice message={error} icon="error" />
     {proof && <img className="payment-proof-preview" src={proof} alt="Your selected payment screenshot" />}
+    </>}
   </div>;
 }

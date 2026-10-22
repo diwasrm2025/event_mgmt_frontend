@@ -42,8 +42,7 @@ export default function AdminPage() {
       router.replace("/signin");
       return;
     }
-    const canManage = session.permissions.includes("users:manage") || session.permissions.includes("roles:manage");
-    if (!canManage) {
+    if (session.role !== "SUPER_ADMIN") {
       router.replace("/dashboard");
       return;
     }

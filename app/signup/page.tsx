@@ -56,7 +56,7 @@ export default function SignUpPage() {
     <AuthFormShell
       eyebrow="Get started"
       title="Create your account"
-      subtitle="Set up an organizer account to start creating and managing events."
+      subtitle="Create an attendee account to register for events and track your bookings. Event-admin access is granted by a Super Admin."
       footer={
         <>
           Already have an account? <Link href="/signin">Sign in</Link>

@@ -16,6 +16,9 @@ import {
   listUsers,
   listAllSystemEvents,
   updateRole,
+  createUser,
+  deleteUser,
+  createOrganizer,
   type AdminUser,
   type Role,
   type SystemEvent,
@@ -48,9 +51,7 @@ export default function SuperAdminDashboardPage() {
       router.replace("/super-admin/signin");
       return;
     }
-    const isSuperAdmin =
-      session.role === "SUPER_ADMIN" ||
-      session.permissions.includes("events:manage_all");
+    const isSuperAdmin = session.role === "SUPER_ADMIN";
     if (!isSuperAdmin) {
       router.replace("/dashboard");
       return;
@@ -347,7 +348,7 @@ function EventsTab({ events }: { events: SystemEvent[] }) {
                           <div className="hint" style={{ fontSize: "0.75rem" }}>{e.time}</div>
                         </td>
                         <td>{e.venue || "Online"}</td>
-                        <td><strong>{e.price > 0 ? `$${e.price}` : "Free"}</strong></td>
+                        <td><strong>{e.eventType === "paid" ? `₹${e.price.toLocaleString("en-IN")}` : "Free"}</strong></td>
                         <td style={{ minWidth: "120px" }}>
                           <div style={{ fontSize: "0.85rem" }}>
                             {e.attendees} / {e.capacity > 0 ? e.capacity : "∞"}
@@ -421,6 +422,7 @@ function UsersAndRolesTab({
 }) {
   const [subTab, setSubTab] = useState<"users" | "roles">("users");
   const [showCreateRole, setShowCreateRole] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   return (
     <div>
@@ -441,6 +443,9 @@ function UsersAndRolesTab({
             <h3>All Registered Users</h3>
             <span className="spacer" />
             <span className="hint">{users.length} users</span>
+            <button className="btn btn-sm btn-primary" onClick={() => setShowCreateUser(true)}>
+              + Create User
+            </button>
           </div>
           <div className="panel-body">
             <DataTablePagination
@@ -458,6 +463,7 @@ function UsersAndRolesTab({
                         <th>Email</th>
                         <th>Role</th>
                         <th>Joined Date</th>
+                        <th style={{ textAlign: "right" }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -483,6 +489,33 @@ function UsersAndRolesTab({
                             </select>
                           </td>
                           <td className="mono">{new Date(user.createdAt).toLocaleDateString()}</td>
+                          <td style={{ textAlign: "right" }}>
+                            {user.id !== myId ? (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ color: "var(--danger)" }}
+                                onClick={async () => {
+                                  const res = await Swal.confirm(
+                                    "Are you sure want to delete",
+                                    `User "${user.name}" (${user.email}) will be permanently deleted.`,
+                                    "Delete"
+                                  );
+                                  if (!res.isConfirmed) return;
+                                  try {
+                                    await deleteUser(user.id);
+                                    onToast("User deleted successfully.");
+                                    onChanged();
+                                  } catch (err) {
+                                    onToast(err instanceof ApiError ? err.message : "Could not delete user.");
+                                  }
+                                }}
+                              >
+                                Delete
+                              </button>
+                            ) : (
+                              <span className="hint" style={{ fontSize: "0.75rem" }}>Active Session</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -491,6 +524,22 @@ function UsersAndRolesTab({
               )}
             </DataTablePagination>
           </div>
+          {showCreateUser ? (
+            <CreateUserModal
+              roles={roles}
+              onClose={() => setShowCreateUser(false)}
+              onSubmit={async (input) => {
+                try {
+                  await createUser(input);
+                  setShowCreateUser(false);
+                  onToast("User account created successfully.");
+                  onChanged();
+                } catch (err) {
+                  onToast(err instanceof ApiError ? err.message : "Could not create user account.");
+                }
+              }}
+            />
+          ) : null}
         </div>
       ) : (
         <div className="panel">
@@ -524,6 +573,77 @@ function UsersAndRolesTab({
           ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+function CreateUserModal({
+  roles,
+  onClose,
+  onSubmit,
+}: {
+  roles: Role[];
+  onClose: () => void;
+  onSubmit: (input: { name: string; email: string; password: string; roleId?: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [roleId, setRoleId] = useState(roles[0]?.id || "");
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div className="modal-overlay open" onClick={onClose}>
+      <form
+        className="modal"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setSaving(true);
+          try {
+            await onSubmit({ name: name.trim(), email: email.trim(), password, roleId: roleId || undefined });
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <div className="modal-head">
+          <h3>Create New User</h3>
+          <span className="spacer" />
+          <button className="btn btn-ghost btn-sm" type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="modal-body" style={{ display: "grid", gap: "14px" }}>
+          <p className="hint" style={{ margin: 0 }}>Create a new user account with full access credentials and assign their system role.</p>
+          <div className="field">
+            <label htmlFor="user-name">Full name</label>
+            <input id="user-name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required minLength={2} maxLength={80} placeholder="e.g. John Doe" />
+          </div>
+          <div className="field">
+            <label htmlFor="user-email">Email address</label>
+            <input id="user-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required placeholder="name@organization.com" />
+          </div>
+          <div className="field">
+            <label htmlFor="user-password">Password</label>
+            <input id="user-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={8} maxLength={72} placeholder="Minimum 8 characters" />
+          </div>
+          <div className="field">
+            <label htmlFor="user-role">Role</label>
+            <select id="user-role" value={roleId} onChange={(event) => setRoleId(event.target.value)} className="input-select">
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {formatRoleName(r.name)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-ghost" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" type="submit" disabled={saving}>
+            {saving ? "Creating..." : "Create User"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

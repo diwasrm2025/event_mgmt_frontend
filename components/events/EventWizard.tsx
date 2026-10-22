@@ -50,11 +50,13 @@ import {
   uploadEventBanner,
   type EventCategory,
   type EventMode,
+  type EventType,
   type EventFormFieldItem,
   type EventItem,
   type EventStatus,
   type FieldType,
 } from "@/lib/events";
+import { getApiBaseUrl } from "@/lib/api";
 import { EventBannerSlider } from "./EventBannerSlider";
 import { SharedMembersPanel } from "./SharedMembersPanel";
 import { EventDashboardSummary } from "./EventDashboardSummary";
@@ -62,36 +64,24 @@ import { EventDashboardSummary } from "./EventDashboardSummary";
 const STEPS = [
   {
     id: 1,
-    label: "Event format",
-    icon: faGlobe,
-    desc: "Choose online or in-person",
+    label: "Event Info & Pricing",
+    icon: faTag,
+    desc: "Format, pricing, schedule & venue",
   },
   {
     id: 2,
-    label: "Event Info",
-    icon: faTag,
-    desc: "Core details — title, category, schedule & venue",
+    label: "Agenda, Details & Media",
+    icon: faImage,
+    desc: "Status, agenda, cover & banner images",
   },
   {
     id: 3,
-    label: "Capacity & Banners",
-    icon: faImage,
-    desc: "Seats, pricing and event cover images",
+    label: "Registration Form",
+    icon: faClipboardList,
+    desc: "Custom booking fields for attendees",
   },
   {
     id: 4,
-    label: "Details",
-    icon: faListCheck,
-    desc: "Status, agenda & featured visibility",
-  },
-  {
-    id: 5,
-    label: "Registration",
-    icon: faClipboardList,
-    desc: "Custom fields for your booking form",
-  },
-  {
-    id: 6,
     label: "Review & Publish",
     icon: faShareNodes,
     desc: "Confirm everything and go live",
@@ -122,10 +112,8 @@ type InfoForm = {
   onlineUrl: string;
   venue: string;
   host: string;
-};
-
-type CapacityForm = {
   capacity: number;
+  eventType: EventType;
   price: number;
 };
 
@@ -197,8 +185,10 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     onlineUrl: "",
     venue: "",
     host: "",
+    capacity: 100,
+    eventType: "free",
+    price: 0,
   });
-  const [capacity, setCapacity] = useState<CapacityForm>({ capacity: 0, price: 0 });
   const [details, setDetails] = useState<DetailsForm>({ status: "draft", featured: false, agenda: "" });
 
   const [fields, setFields] = useState<EventFormFieldItem[]>([]);
@@ -208,6 +198,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   const hydrateFromEvent = useCallback((loaded: EventItem) => {
     setEvent(loaded);
     const tParts = parse24HrTime(loaded.time || "");
+    const evtType: EventType = loaded.eventType ?? (loaded.price > 0 ? "paid" : "free");
     setInfo({
       title: loaded.title,
       category: loaded.category,
@@ -220,11 +211,13 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       onlineUrl: loaded.onlineUrl,
       venue: loaded.venue,
       host: loaded.host,
+      capacity: loaded.capacity,
+      eventType: evtType,
+      price: loaded.price,
     });
-    setCapacity({ capacity: loaded.capacity, price: loaded.price });
     setDetails({ status: loaded.status, featured: loaded.featured, agenda: loaded.agenda.join("\n") });
     setFields((loaded.fields ?? []).slice().sort((a, b) => a.order - b.order));
-    setMaxStepReached((current) => Math.max(current, loaded.slug ? 6 : Math.min(loaded.wizardStep || 1, 6)));
+    setMaxStepReached((current) => Math.max(current, loaded.slug ? 4 : Math.min(loaded.wizardStep || 1, 4)));
   }, []);
 
   useEffect(() => {
@@ -235,7 +228,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         const loaded = await getEvent(eventId);
         if (loaded) {
           hydrateFromEvent(loaded);
-          setStep(loaded.slug ? 6 : Math.min(loaded.wizardStep || 1, 6));
+          setStep(loaded.slug ? 4 : Math.min(loaded.wizardStep || 1, 4));
         } else {
           setError("This event could not be found.");
         }
@@ -266,7 +259,11 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     if (!info.title.trim()) errs.title = "Event title is required.";
     if (!info.date) errs.date = "Please select an event date.";
     if (info.eventMode === "online" && !info.onlineUrl.trim()) errs.onlineUrl = "Online event link is required.";
-    if (info.eventMode === "offline" && !info.venue.trim()) errs.venue = "Venue is required.";
+    if (info.eventMode === "offline" && !info.venue.trim()) errs.venue = "Venue location is required.";
+    if (!info.capacity || info.capacity < 1) errs.capacity = "Total seats must be at least 1.";
+    if (info.eventType === "paid" && (!info.price || info.price <= 0)) {
+      errs.price = "Paid events must have a ticket price greater than zero.";
+    }
     return errs;
   };
 
@@ -296,10 +293,13 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         onlineUrl: info.onlineUrl.trim(),
         venue: info.venue.trim(),
         host: info.host.trim() || "Organizer",
-        wizardStep: 3,
+        capacity: Number(info.capacity),
+        eventType: info.eventType,
+        price: info.eventType === "paid" ? Number(info.price) : 0,
+        wizardStep: 2,
       });
-      if (updated) setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
-      advance(3);
+      setEvent((c) => ({ ...updated, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
+      advance(2);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save event info.");
     } finally {
@@ -307,65 +307,39 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     }
   };
 
-  const validateStep2 = (): Record<string, string> => {
-    const errs: Record<string, string> = {};
-    if (!capacity.capacity || capacity.capacity < 1) errs.capacity = "Capacity must be at least 1.";
-    if (capacity.price < 0) errs.price = "Price cannot be negative.";
-    return errs;
-  };
-
-  const submitCapacity = async (formEvent: FormEvent) => {
-    formEvent.preventDefault();
-    if (!event) return;
-    const errs = validateStep2();
-    if (Object.keys(errs).length) {
-      setStepErrors(errs);
-      return;
-    }
-    setStepErrors({});
-    setError("");
-    setSaving(true);
-    try {
-      const updated = await updateEvent(event.id, {
-        capacity: Number(capacity.capacity),
-        price: Number(capacity.price),
-        wizardStep: 4,
-      });
-      if (updated) setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
-      advance(4);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save capacity.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const [bannerDragActive, setBannerDragActive] = useState(false);
 
-  const handleBannerFile = async (file: File | undefined | null) => {
-    if (!file || !event) return;
-    if (!file.type.startsWith("image/")) {
-      onToast("Only image files can be used as banners.");
-      return;
-    }
+  const handleBannerFiles = async (files: FileList | File[] | File | undefined | null) => {
+    if (!files || !event) return;
+    const fileList = files instanceof File ? [files] : Array.from(files);
+    if (!fileList.length) return;
     setUploadingBanner(true);
     try {
-      const updated = await uploadEventBanner(event.id, file);
-      setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
-      onToast("Banner added.");
+      let latestEvent = event;
+      for (const file of fileList) {
+        if (!file.type.startsWith("image/")) {
+          onToast(`Skipped ${file.name}: only image files are allowed.`);
+          continue;
+        }
+        latestEvent = await uploadEventBanner(latestEvent.id, file);
+      }
+      setEvent((c) => ({ ...latestEvent, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
+      onToast("Photo(s) added.");
     } catch (err) {
-      onToast(err instanceof Error ? err.message : "Could not upload that image.");
+      onToast(err instanceof Error ? err.message : "Could not upload image.");
     } finally {
       setUploadingBanner(false);
     }
   };
+  const handleBannerFile = (file: File | undefined | null) => void handleBannerFiles(file);
 
   const handleRemoveBanner = async (url: string) => {
     if (!event) return;
-    if (!(await Swal.confirm("Remove this event photo?", "This photo will no longer appear on the event page.", "Remove photo")).isConfirmed) return;
+    if (!(await Swal.confirm("Are you sure want to delete", "This photo will no longer appear on the event page.", "Remove photo")).isConfirmed) return;
     try {
       const updated = await removeEventBanner(event.id, url);
-      setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
+      setEvent((c) => ({ ...updated, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
+      onToast("Banner removed.");
     } catch {
       onToast("Could not remove that banner.");
     }
@@ -384,15 +358,38 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
           .split("\n")
           .map((line) => line.trim())
           .filter(Boolean),
-        wizardStep: 5,
+        wizardStep: 3,
       });
-      if (updated) setEvent(current => ({ ...updated, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
-      advance(5);
+      setEvent((c) => ({ ...updated, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
+      advance(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save these details.");
     } finally {
       setSaving(false);
     }
+  };
+
+  // Reorder banners to put chosen URL at index 0 (= default slide)
+  const setDefaultSlide = async (url: string) => {
+    if (!event) return;
+    const banners = event.banners ?? [];
+    const idx = banners.indexOf(url);
+    if (idx <= 0) return; // already default
+    const reordered = [url, ...banners.filter((b) => b !== url)];
+    try {
+      const updated = await updateEvent(event.id, { banners: reordered });
+      setEvent((c) => ({ ...updated, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
+      onToast("Default slide updated.");
+    } catch {
+      onToast("Could not update default slide.");
+    }
+  };
+
+  // Build a full URL from a possibly-relative banner path
+  const bannerSrc = (url: string) => {
+    if (/^https?:\/\//i.test(url)) return url;
+    const base = getApiBaseUrl().replace(/\/api$/, "");
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   const addField = async (formEvent: FormEvent) => {
@@ -409,7 +406,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         type: newField.type,
         required: newField.required,
         options:
-          newField.type === "select"
+          newField.type === "select" || newField.type === "radio"
             ? newField.options
                 .split(",")
                 .map((option) => option.trim())
@@ -418,6 +415,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       });
       setFields((current) => [...current, created]);
       setNewField(emptyNewField());
+      onToast("Field added to registration form.");
     } catch (err) {
       onToast(err instanceof Error ? err.message : "Could not add that field.");
     } finally {
@@ -430,17 +428,18 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     try {
       const updated = await updateEventField(event.id, field.id, { required: !field.required });
       setFields((current) => current.map((item) => (item.id === field.id ? updated : item)));
-    } catch {
-      onToast("Could not update that field.");
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Could not update that field.");
     }
   };
 
   const deleteField = async (field: EventFormFieldItem) => {
     if (!event) return;
-    if (!(await Swal.confirm("Remove this registration field?", field.label, "Remove field")).isConfirmed) return;
+    if (!(await Swal.confirm("Are you sure want to delete", field.label, "Remove field")).isConfirmed) return;
     try {
       await removeEventField(event.id, field.id);
       setFields((current) => current.filter((item) => item.id !== field.id));
+      onToast("Registration field removed.");
     } catch {
       onToast("Could not remove that field.");
     }
@@ -456,7 +455,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     try {
       const reordered = await reorderEventFields(
         event.id,
-        next.map((field) => field.id),
+        next.map((f) => f.id),
       );
       setFields(reordered);
     } catch {
@@ -465,7 +464,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   };
 
   const finishFields = () => {
-    advance(6);
+    advance(4);
   };
 
   const publish = async () => {
@@ -493,7 +492,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const handleDelete = async () => {
     if (!event) return;
-    const res = await Swal.confirm(`Delete "${event.title}"?`, "This event will be permanently deleted.");
+    const res = await Swal.confirm("Are you sure want to delete", `Event "${event.title}" will be permanently deleted.`);
     if (!res.isConfirmed) return;
     try {
       await removeEvent(event.id);
@@ -514,12 +513,30 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   }
 
   if (event && event.isOwner === false && !event.sharedPermissions?.includes("EDIT")) {
-    return <section className="panel"><div className="panel-body">
-      <EventBannerSlider banners={event.banners || []} title={event.title} />
-      <h1>{event.title}</h1><p>{event.description}</p>
-      <dl><dt>Date</dt><dd>{event.date} {event.time}</dd><dt>Venue</dt><dd>{event.venue || "Online event"}</dd><dt>Host</dt><dd>{event.host}</dd><dt>Registration fee</dt><dd>{event.price}</dd></dl>
-      <Link className="btn btn-accent" href={`/dashboard/events/${event.id}/attendees`}>View attendees</Link>
-    </div></section>;
+    return (
+      <section className="panel">
+        <div className="panel-body">
+          <EventBannerSlider banners={event.banners || []} title={event.title} />
+          <h1>{event.title}</h1>
+          <p>{event.description}</p>
+          <dl>
+            <dt>Date</dt>
+            <dd>
+              {event.date} {event.time}
+            </dd>
+            <dt>Venue</dt>
+            <dd>{event.venue || "Online event"}</dd>
+            <dt>Host</dt>
+            <dd>{event.host}</dd>
+            <dt>Event type</dt>
+            <dd>{event.eventType === "free" ? "Free Event" : formatCurrency(event.price)}</dd>
+          </dl>
+          <Link className="btn btn-accent" href={`/dashboard/events/${event.id}/attendees`}>
+            View attendees
+          </Link>
+        </div>
+      </section>
+    );
   }
 
   const FieldErr = ({ name }: { name: string }) =>
@@ -568,7 +585,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               </span>
               {event.slug && (
                 <div className="hint" style={{ marginTop: 8, fontSize: 11 }}>
-                  Step {step} of 5
+                  Step {step} of 4
                 </div>
               )}
             </div>
@@ -580,41 +597,99 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       <div className="wizard-content">
         <FeedbackNotice message={error} icon="error" />
 
-        {/* ── Step 1: Event Info ─────────────────────────────── */}
+        {/* ── Step 1: Event Info, Format & Pricing ─────────────────────────────── */}
         {step === 1 ? (
-          <form onSubmit={(formEvent) => { formEvent.preventDefault(); advance(2); }} className="wizard-form">
-            <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 1 of 6</div>
-              <h3>Choose your event format</h3>
-              <p className="hint">Start by telling us how attendees will experience this event.</p>
-            </div>
-            <div className="wizard-section event-mode-section">
-              <div className="wizard-section-title"><FontAwesomeIcon icon={faGlobe} /> Event format</div>
-              <div className="event-mode-choice-grid">
-                <button type="button" className={`event-mode-choice ${info.eventMode === "online" ? "selected" : ""}`} onClick={() => setInfo({ ...info, eventMode: "online" })}>
-                  <strong>Online event</strong><span>Attendees join using a meeting link.</span>
-                </button>
-                <button type="button" className={`event-mode-choice ${info.eventMode === "offline" ? "selected" : ""}`} onClick={() => setInfo({ ...info, eventMode: "offline" })}>
-                  <strong>In-person event</strong><span>Attendees arrive at a physical venue.</span>
-                </button>
-              </div>
-            </div>
-            <div className="wizard-foot"><span /><button className="btn btn-accent" type="submit">Continue <FontAwesomeIcon icon={faArrowRight} /></button></div>
-          </form>
-        ) : null}
-
-        {step === 2 ? (
           <form onSubmit={submitInfo} noValidate className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 2 of 6</div>
-              <h3>Event Information</h3>
-              <p className="hint">Fill in the core details — title, category, date, time and venue.</p>
+              <div className="wizard-step-badge-pill">Step 1 of 4</div>
+              <h3>Event Details &amp; Pricing</h3>
+              <p className="hint">Set your event format, pricing model, venue, schedule, and basic info.</p>
             </div>
 
-            {/* Basic Info */}
+            {/* Group 1: Format & Pricing (Side-by-side) */}
             <div className="wizard-section">
               <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faTag} /> Basic Info
+                <FontAwesomeIcon icon={faGlobe} /> Event Format &amp; Pricing
+              </div>
+              <div className="wizard-format-pricing-grid">
+                {/* Column 1: Event Format */}
+                <div className="format-subgroup">
+                  <label className="subgroup-label">Event Mode</label>
+                  <div className="event-mode-choice-grid">
+                    <button
+                      type="button"
+                      className={`event-mode-choice ${info.eventMode === "offline" ? "selected" : ""}`}
+                      onClick={() => setInfo({ ...info, eventMode: "offline" })}
+                    >
+                      <strong>In-person event</strong>
+                      <span>Attendees arrive at a physical venue.</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`event-mode-choice ${info.eventMode === "online" ? "selected" : ""}`}
+                      onClick={() => setInfo({ ...info, eventMode: "online" })}
+                    >
+                      <strong>Online event</strong>
+                      <span>Attendees join via video / meeting link.</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Column 2: Event Pricing */}
+                <div className="format-subgroup">
+                  <label className="subgroup-label">Pricing Type</label>
+                  <div className="event-mode-choice-grid">
+                    <button
+                      type="button"
+                      className={`event-mode-choice ${info.eventType === "free" ? "selected" : ""}`}
+                      onClick={() => setInfo({ ...info, eventType: "free", price: 0 })}
+                    >
+                      <strong>Free Event</strong>
+                      <span>No registration fee or payment required.</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`event-mode-choice ${info.eventType === "paid" ? "selected" : ""}`}
+                      onClick={() => setInfo({ ...info, eventType: "paid" })}
+                    >
+                      <strong>Paid Event</strong>
+                      <span>Attendees pay an admission fee.</span>
+                    </button>
+                  </div>
+
+                  {info.eventType === "paid" && (
+                    <div className="field" style={{ marginTop: 12 }}>
+                      <label htmlFor="w-price">
+                        <FontAwesomeIcon icon={faTicket} className="field-icon" /> Ticket Price (₹){" "}
+                        <span className="required-star">*</span>
+                      </label>
+                      <input
+                        id="w-price"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="e.g. 499"
+                        value={info.price === 0 ? "" : info.price}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setInfo({ ...info, price: val === "" ? 0 : Math.max(0, parseFloat(val) || 0) });
+                        }}
+                        className={stepErrors.price ? "input-error" : ""}
+                        required
+                      />
+                      <FieldErr name="price" />
+                      <div className="hint">Attendees will be directed to payment checkout during registration.</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Group 2: Basic Info */}
+            <div className="wizard-section">
+              <div className="wizard-section-title">
+                <FontAwesomeIcon icon={faTag} /> Basic Information
               </div>
               <div className="field">
                 <label htmlFor="w-title">
@@ -624,7 +699,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   id="w-title"
                   value={info.title}
                   onChange={(e) => setInfo({ ...info, title: e.target.value })}
-                  placeholder="e.g. Autumn Sound Sessions 2026"
+                  placeholder="e.g. SRM Tech Fusion Symposium 2026"
                   className={stepErrors.title ? "input-error" : ""}
                   required
                 />
@@ -651,22 +726,22 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 </div>
                 <div className="field">
                   <label htmlFor="w-host">
-                    <FontAwesomeIcon icon={faMicrophone} className="field-icon" /> Host / Organization
+                    <FontAwesomeIcon icon={faMicrophone} className="field-icon" /> Host / Department
                   </label>
                   <input
                     id="w-host"
                     value={info.host}
                     onChange={(e) => setInfo({ ...info, host: e.target.value })}
-                    placeholder="e.g. Northline Events Pvt. Ltd."
+                    placeholder="e.g. SRM Trichy Department of CS"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Schedule & Venue */}
+            {/* Group 3: Schedule & Venue */}
             <div className="wizard-section">
               <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faCalendarDays} /> Schedule &amp; Venue
+                <FontAwesomeIcon icon={faCalendarDays} /> Schedule &amp; Location
               </div>
 
               <div className="wizard-field-row">
@@ -693,8 +768,10 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                       onChange={(e) => setInfo({ ...info, timeHour: e.target.value })}
                       aria-label="Hour"
                     >
-                      {["01","02","03","04","05","06","07","08","09","10","11","12"].map((h) => (
-                        <option key={h} value={h}>{h}</option>
+                      {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
                       ))}
                     </select>
                     <span className="time-sep">:</span>
@@ -703,8 +780,10 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                       onChange={(e) => setInfo({ ...info, timeMinute: e.target.value })}
                       aria-label="Minute"
                     >
-                      {["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => (
-                        <option key={m} value={m}>{m}</option>
+                      {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
                       ))}
                     </select>
                     <select
@@ -720,30 +799,73 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 </div>
               </div>
 
-              {info.eventMode === "online" ? <div className="field">
-                <label htmlFor="w-online-url"><FontAwesomeIcon icon={faGlobe} className="field-icon" /> Online event link <span className="required-star">*</span></label>
-                <input id="w-online-url" type="url" value={info.onlineUrl} onChange={(e) => setInfo({ ...info, onlineUrl: e.target.value })} placeholder="https://meet.example.com/event" className={stepErrors.onlineUrl ? "input-error" : ""} />
-                <FieldErr name="onlineUrl" />
-              </div> : <div className="field">
-                <label htmlFor="w-venue">
-                  <FontAwesomeIcon icon={faMapPin} className="field-icon" /> Venue Location{" "}
-                  <span className="required-star">*</span>
-                </label>
-                <input
-                  id="w-venue"
-                  value={info.venue}
-                  onChange={(e) => setInfo({ ...info, venue: e.target.value })}
-                  placeholder="e.g. Riverside Amphitheatre, Downtown Main Stage"
-                  className={stepErrors.venue ? "input-error" : ""}
-                />
-                <FieldErr name="venue" />
-              </div>}
+              {info.eventMode === "online" ? (
+                <div className="field">
+                  <label htmlFor="w-online-url">
+                    <FontAwesomeIcon icon={faGlobe} className="field-icon" /> Online Event Link / Meeting URL{" "}
+                    <span className="required-star">*</span>
+                  </label>
+                  <input
+                    id="w-online-url"
+                    type="url"
+                    value={info.onlineUrl}
+                    onChange={(e) => setInfo({ ...info, onlineUrl: e.target.value })}
+                    placeholder="https://meet.google.com/xyz-abc or Zoom link"
+                    className={stepErrors.onlineUrl ? "input-error" : ""}
+                  />
+                  <FieldErr name="onlineUrl" />
+                </div>
+              ) : (
+                <div className="field">
+                  <label htmlFor="w-venue">
+                    <FontAwesomeIcon icon={faMapPin} className="field-icon" /> Venue Location{" "}
+                    <span className="required-star">*</span>
+                  </label>
+                  <input
+                    id="w-venue"
+                    value={info.venue}
+                    onChange={(e) => setInfo({ ...info, venue: e.target.value })}
+                    placeholder="e.g. Auditorium Hall B, SRM Trichy Campus"
+                    className={stepErrors.venue ? "input-error" : ""}
+                  />
+                  <FieldErr name="venue" />
+                </div>
+              )}
             </div>
 
-            {/* Description */}
+            {/* Group 4: Capacity & Seats */}
+            <div className="wizard-section">
+              <div className="wizard-section-title">
+                <FontAwesomeIcon icon={faUsers} /> Capacity &amp; Registration Limit
+              </div>
+              <div className="field">
+                <label htmlFor="w-capacity">
+                  Total Available Seats <span className="required-star">*</span>
+                </label>
+                <input
+                  id="w-capacity"
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 250"
+                  value={info.capacity === 0 ? "" : info.capacity}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInfo({ ...info, capacity: val === "" ? 0 : Math.max(0, parseInt(val, 10) || 0) });
+                  }}
+                  className={stepErrors.capacity ? "input-error" : ""}
+                />
+                <FieldErr name="capacity" />
+                <div className="hint">Maximum number of attendees allowed to register.</div>
+              </div>
+            </div>
+
+            {/* Group 5: Description */}
             <div className="wizard-section">
               <div className="wizard-section-title" style={{ justifyContent: "space-between" }}>
-                <span><FontAwesomeIcon icon={faAlignLeft} /> About &amp; Description</span>
+                <span>
+                  <FontAwesomeIcon icon={faAlignLeft} /> About &amp; Description
+                </span>
                 <span className="hint" style={{ fontSize: "0.75rem", fontWeight: 400 }}>
                   {info.description.length} chars
                 </span>
@@ -754,156 +876,31 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   rows={4}
                   value={info.description}
                   onChange={(e) => setInfo({ ...info, description: e.target.value })}
-                  placeholder="Tell attendees what to expect — the key highlights, who it's for, and why they shouldn't miss it."
+                  placeholder="Tell attendees what to expect — highlights, schedule details, guidelines, and who should attend."
                 />
               </div>
-            
             </div>
 
             <div className="wizard-foot">
+              <span />
               <button className="btn btn-accent" type="submit" disabled={saving}>
-                {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue{" "}
+                {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue to Agenda &amp; Media{" "}
                 <FontAwesomeIcon icon={faArrowRight} />
               </button>
             </div>
           </form>
         ) : null}
 
-        {/* ── Step 2: Capacity & Banners ─────────────────────── */}
-        {step === 3 && event ? (
-          <form onSubmit={submitCapacity} noValidate className="wizard-form">
-            <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 3 of 6</div>
-              <h3>Capacity, Pricing &amp; Banners</h3>
-              <p className="hint">Set the number of available seats, ticket price, and upload cover imagery.</p>
-            </div>
-
-            <div className="wizard-section">
-              <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faTicket} /> Seats &amp; Pricing
-              </div>
-              <div className="wizard-field-row">
-                <div className="field">
-                  <label htmlFor="w-capacity">
-                    <FontAwesomeIcon icon={faUsers} className="field-icon" /> Total Seats{" "}
-                    <span className="required-star">*</span>
-                  </label>
-                  <input
-                    id="w-capacity"
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 500"
-                    value={capacity.capacity === 0 ? "" : capacity.capacity}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCapacity({ ...capacity, capacity: val === "" ? 0 : Math.max(0, parseInt(val, 10) || 0) });
-                    }}
-                    className={stepErrors.capacity ? "input-error" : ""}
-                  />
-                  <FieldErr name="capacity" />
-                </div>
-                <div className="field">
-                  <label htmlFor="w-price">
-                    <FontAwesomeIcon icon={faTicket} className="field-icon" /> Ticket Price (₹)
-                  </label>
-                  <input
-                    id="w-price"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="0 for free events"
-                    value={capacity.price === 0 ? "" : capacity.price}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCapacity({ ...capacity, price: val === "" ? 0 : Math.max(0, parseFloat(val) || 0) });
-                    }}
-                    className={stepErrors.price ? "input-error" : ""}
-                  />
-                  <FieldErr name="price" />
-                  <div className="hint">Enter 0 for a free event.</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="wizard-section">
-              <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faImage} /> Banner Images / Slides
-              </div>
-              <p className="hint" style={{ marginBottom: 12 }}>
-                Add up to 8 images. The first one is used as the main hero banner.
-              </p>
-              <div className="banner-grid">
-                {event.banners.map((url) => (
-                  <div className="banner-tile" key={url}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/?$/, "")}${url}`}
-                      alt="Event banner"
-                    />
-                    <button
-                      type="button"
-                      className="banner-remove"
-                      onClick={() => handleRemoveBanner(url)}
-                      aria-label="Remove banner"
-                    >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                  </div>
-                ))}
-                {event.banners.length < 8 ? (
-                  <button
-                    type="button"
-                    className={`banner-dropzone ${bannerDragActive ? "drag-active" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingBanner}
-                    onDragOver={(e) => { e.preventDefault(); setBannerDragActive(true); }}
-                    onDragLeave={() => setBannerDragActive(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setBannerDragActive(false);
-                      void handleBannerFile(e.dataTransfer.files?.[0]);
-                    }}
-                  >
-                    <FontAwesomeIcon icon={uploadingBanner ? faSpinner : faCloudArrowUp} spin={uploadingBanner} />
-                    {uploadingBanner ? "Uploading..." : "Drag & drop, or click to add"}
-                  </button>
-                ) : null}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => {
-                  void handleBannerFile(e.target.files?.[0]);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-
-            <div className="wizard-foot">
-              <button className="btn btn-ghost" type="button" onClick={() => goToStep(2)}>
-                <FontAwesomeIcon icon={faArrowLeft} /> Back
-              </button>
-              <button className="btn btn-accent" type="submit" disabled={saving}>
-                {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue{" "}
-                <FontAwesomeIcon icon={faArrowRight} />
-              </button>
-            </div>
-          </form>
-        ) : null}
-
-        {/* ── Step 3: Details ─────────────────────────────────── */}
-        {step === 4 && event ? (
+        {/* ── Step 2: Agenda, Details & Media (cover + banners merged in) ──────── */}
+        {step === 2 && event ? (
           <form onSubmit={submitDetails} noValidate className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 4 of 6</div>
-              <h3>Event Details</h3>
-              <p className="hint">Set the current status, schedule agenda items, and visibility settings.</p>
+              <div className="wizard-step-badge-pill">Step 2 of 4</div>
+              <h3>Agenda, Details &amp; Media</h3>
+              <p className="hint">Set publication status, agenda, visibility, and upload your event cover &amp; banner images.</p>
             </div>
 
+            {/* ── Publication Status ──────────────────── */}
             <div className="wizard-section">
               <div className="wizard-section-title">
                 <FontAwesomeIcon icon={faGlobe} /> Publication Status
@@ -917,14 +914,15 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 >
                   <option value="draft">📝 Draft — not visible to the public</option>
                   <option value="published">✅ Published — open for registrations</option>
-                  <option value="sold-out">🔴 Sold Out — no more seats</option>
+                  <option value="sold-out">🔴 Sold Out — no more seats available</option>
                 </select>
               </div>
             </div>
 
+            {/* ── Agenda ──────────────────────────────── */}
             <div className="wizard-section">
               <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faListCheck} /> Agenda / Schedule
+                <FontAwesomeIcon icon={faListCheck} /> Agenda &amp; Program Schedule
               </div>
               <div className="field">
                 <textarea
@@ -932,15 +930,99 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   rows={6}
                   value={details.agenda}
                   onChange={(e) => setDetails({ ...details, agenda: e.target.value })}
-                  placeholder={"9:00 AM – Welcome & Registration\n10:00 AM – Keynote Address\n11:30 AM – Panel Discussion\n1:00 PM – Lunch Break\n2:30 PM – Workshops"}
+                  placeholder={"09:00 AM – Registration & Welcome\n10:00 AM – Keynote Address\n11:30 AM – Panel Session\n01:00 PM – Networking Lunch\n02:30 PM – Interactive Workshop"}
                 />
-                <div className="hint">One schedule item per line. These appear on the public event page.</div>
+                <div className="hint">One item per line. These will be formatted on the public event page.</div>
               </div>
             </div>
 
+            {/* ── Cover & Banners ─────────────────────── */}
             <div className="wizard-section">
               <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faStar} /> Visibility
+                <FontAwesomeIcon icon={faImage} /> Cover &amp; Banner Images
+              </div>
+              <p className="hint" style={{ marginBottom: 12 }}>
+                Upload cover photos. The <strong>first image</strong> is used as the default slide. Click{" "}
+                <strong>Set as Default</strong> on any thumbnail to make it the primary banner.
+              </p>
+
+              <div className="banner-thumb-grid">
+                {(event.banners || []).map((url, idx) => (
+                  <div key={url} className={`banner-thumb-item ${idx === 0 ? "banner-thumb-active" : ""}`}>
+                    <img src={bannerSrc(url)} alt={`Banner ${idx + 1}`} />
+                    {idx === 0 ? (
+                      <span className="banner-default-badge">⭐ Default</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="banner-set-default-btn"
+                        onClick={() => setDefaultSlide(url)}
+                        title="Set as default slide"
+                      >
+                        Set Default
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="banner-remove-btn"
+                      onClick={() => handleRemoveBanner(url)}
+                      title="Remove photo"
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Compact Add Image Card with "+" matching slide preview card size */}
+                <div
+                  className={`banner-thumb-add ${bannerDragActive ? "drag-active" : ""}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setBannerDragActive(true);
+                  }}
+                  onDragLeave={() => setBannerDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setBannerDragActive(false);
+                    void handleBannerFiles(e.dataTransfer.files);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload cover / banner image"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                >
+                  <FontAwesomeIcon
+                    icon={uploadingBanner ? faSpinner : faPlus}
+                    spin={uploadingBanner}
+                    className="banner-add-icon"
+                  />
+                  <span className="banner-add-label">
+                    {uploadingBanner ? "Uploading…" : "Add Image"}
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      void handleBannerFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Featured Toggle ─────────────────────── */}
+            <div className="wizard-section">
+              <div className="wizard-section-title">
+                <FontAwesomeIcon icon={faStar} /> Feature &amp; Promotion
               </div>
               <label className="check-row">
                 <input
@@ -948,44 +1030,46 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   checked={details.featured}
                   onChange={(e) => setDetails({ ...details, featured: e.target.checked })}
                 />
-                ⭐ Feature this event — display it prominently on the dashboard and public listing
+                ⭐ Highlight as Featured Event — displayed prominently on the home page and public lists
               </label>
             </div>
 
             <div className="wizard-foot">
-              <button className="btn btn-ghost" type="button" onClick={() => goToStep(3)}>
+              <button className="btn btn-ghost" type="button" onClick={() => goToStep(1)}>
                 <FontAwesomeIcon icon={faArrowLeft} /> Back
               </button>
               <button className="btn btn-accent" type="submit" disabled={saving}>
-                {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue{" "}
+                {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue to Registration Form{" "}
                 <FontAwesomeIcon icon={faArrowRight} />
               </button>
             </div>
           </form>
         ) : null}
 
-        {/* ── Step 4: Registration Fields ───────────────────────── */}
-        {step === 5 && event ? (
+        {/* ── Step 3: Custom Registration Fields ───────────────────────── */}
+        {step === 3 && event ? (
           <div className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 5 of 6</div>
+              <div className="wizard-step-badge-pill">Step 3 of 4</div>
               <h3>Registration Form Fields</h3>
-              <p className="hint">Build the form guests fill out to book a seat.</p>
+              <p className="hint">
+                Customize the attendee questions. Name and Email are always collected automatically.
+              </p>
             </div>
 
             <div className="registration-notice-banner">
               <FontAwesomeIcon icon={faCircleInfo} style={{ color: "var(--accent)", fontSize: 16, flexShrink: 0 }} />
               <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-                <strong>Default Fields Already Included:</strong> Full Name, Mobile Number and Email Address are automatically collected for every booking. Only add <em>extra</em> fields your attendees need.
+                <strong>Always Collected:</strong> Full Name and Email Address, Phone Number are automatically collected for every attendee. Add any extra information you need (e.g. Department, Roll No, T-Shirt Size).
               </div>
             </div>
 
             <div className="reg-builder-grid">
-              {/* Left: Field List + Add Form */}
+              {/* Left: Fields List + Add New Field */}
               <div className="reg-builder-left">
                 <div className="wizard-section">
                   <div className="wizard-section-title">
-                    <FontAwesomeIcon icon={faListCheck} /> Custom Registration Fields
+                    <FontAwesomeIcon icon={faListCheck} /> Custom Fields ({fields.length})
                   </div>
                   <div className="field-builder-list">
                     {fields.map((field, index) => (
@@ -1046,7 +1130,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                           textAlign: "center",
                         }}
                       >
-                        No custom fields added yet.
+                        No custom fields yet. The default Name &amp; Email are sufficient for most events.
                       </div>
                     ) : null}
                   </div>
@@ -1054,7 +1138,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
                 <div className="add-field-card">
                   <div className="wizard-section-title" style={{ marginBottom: 14 }}>
-                    <FontAwesomeIcon icon={faPlus} /> Add New Field
+                    <FontAwesomeIcon icon={faPlus} /> Add Custom Field
                   </div>
                   <form onSubmit={addField} noValidate>
                     <div className="wizard-field-row ratio-2-1">
@@ -1064,7 +1148,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                           id="nf-label"
                           value={newField.label}
                           onChange={(e) => setNewField({ ...newField, label: e.target.value })}
-                          placeholder="e.g. T-shirt Size, Company"
+                          placeholder="e.g. Student Register Number"
                         />
                       </div>
                       <div className="field" style={{ margin: 0 }}>
@@ -1084,12 +1168,14 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                     </div>
                     {newField.type === "select" || newField.type === "radio" ? (
                       <div className="field" style={{ marginTop: 10 }}>
-                        <label htmlFor="nf-options">{newField.type === "radio" ? "Radio" : "Dropdown"} Options (comma-separated)</label>
+                        <label htmlFor="nf-options">
+                          {newField.type === "radio" ? "Radio" : "Dropdown"} Options (comma-separated)
+                        </label>
                         <input
                           id="nf-options"
                           value={newField.options}
                           onChange={(e) => setNewField({ ...newField, options: e.target.value })}
-                          placeholder="e.g. Small, Medium, Large, XL"
+                          placeholder="e.g. 1st Year, 2nd Year, 3rd Year, 4th Year"
                         />
                       </div>
                     ) : null}
@@ -1100,7 +1186,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                           checked={newField.required}
                           onChange={(e) => setNewField({ ...newField, required: e.target.checked })}
                         />
-                        Required
+                        Required field
                       </label>
                       <button className="btn btn-accent btn-sm" type="submit" disabled={savingField}>
                         <FontAwesomeIcon icon={savingField ? faSpinner : faPlus} spin={savingField} /> Add Field
@@ -1113,23 +1199,22 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               {/* Right: Live Preview */}
               <div className="reg-builder-right">
                 <div className="reg-preview-header">
-                  <span className="panel-kicker" style={{ margin: 0, fontSize: 11 }}>Live Preview</span>
-                  <span className="badge" style={{ fontSize: 10 }}>Guest Booking Form</span>
+                  <span className="panel-kicker" style={{ margin: 0, fontSize: 11 }}>Live Form Preview</span>
+                  <span className="badge" style={{ fontSize: 10 }}>Attendee View</span>
                 </div>
-                <div className="preview-form-box" style={{ opacity: 0.9, pointerEvents: "none" }}>
+                <div className="preview-form-box" style={{ opacity: 0.95, pointerEvents: "none" }}>
                   <div className="field" style={{ margin: "0 0 10px" }}>
                     <label style={{ fontSize: 12 }}>Full Name *</label>
-                    <input readOnly placeholder="John Doe" style={{ padding: "8px 12px", fontSize: 13 }} />
-                  </div>
-                  <div className="field" style={{ margin: "0 0 10px" }}>
-                    <label style={{ fontSize: 12 }}>Mobile Number *</label>
-                    <input readOnly placeholder="+91 98765 43210" style={{ padding: "8px 12px", fontSize: 13 }} />
+                    <input readOnly placeholder="e.g. Priya Sharma" style={{ padding: "8px 12px", fontSize: 13 }} />
                   </div>
                   <div className="field" style={{ margin: "0 0 10px" }}>
                     <label style={{ fontSize: 12 }}>Email Address *</label>
-                    <input readOnly placeholder="john@example.com" style={{ padding: "8px 12px", fontSize: 13 }} />
+                    <input readOnly placeholder="priya@example.com" style={{ padding: "8px 12px", fontSize: 13 }} />
                   </div>
-                 
+                  <div className="field" style={{ margin: "0 0 10px" }}>
+                    <label style={{ fontSize: 12 }}>Mobile Number *</label>
+                    <input readOnly placeholder="e.g. 9876543210" style={{ padding: "8px 12px", fontSize: 13 }} />
+                  </div>
 
                   {fields.map((f) => (
                     <div className="field" style={{ margin: "0 0 10px" }} key={f.id}>
@@ -1147,10 +1232,16 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                         </select>
                       ) : f.type === "radio" ? (
                         <div className="preview-choice-list">
-                          {f.options.map((opt) => <label key={opt}><input type="radio" disabled name={`preview-${f.id}`} /> {opt}</label>)}
+                          {f.options.map((opt) => (
+                            <label key={opt}>
+                              <input type="radio" disabled name={`preview-${f.id}`} /> {opt}
+                            </label>
+                          ))}
                         </div>
                       ) : f.type === "checkbox" ? (
-                        <label><input type="checkbox" disabled /> {f.label}</label>
+                        <label>
+                          <input type="checkbox" disabled /> {f.label}
+                        </label>
                       ) : (
                         <input
                           readOnly
@@ -1163,30 +1254,30 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   ))}
 
                   <button className="btn btn-accent btn-sm" style={{ width: "100%", marginTop: 12 }} disabled>
-                    Complete Booking &amp; Register
+                    {info.eventType === "free" ? "Register for Free" : `Pay & Register (${formatCurrency(info.price)})`}
                   </button>
                 </div>
               </div>
             </div>
 
             <div className="wizard-foot">
-              <button className="btn btn-ghost" type="button" onClick={() => goToStep(4)}>
+              <button className="btn btn-ghost" type="button" onClick={() => goToStep(2)}>
                 <FontAwesomeIcon icon={faArrowLeft} /> Back
               </button>
               <button className="btn btn-accent" type="button" onClick={finishFields}>
-                Continue <FontAwesomeIcon icon={faArrowRight} />
+                Continue to Review <FontAwesomeIcon icon={faArrowRight} />
               </button>
             </div>
           </div>
         ) : null}
 
-        {/* ── Step 5: Review & Publish ─────────────────────────── */}
-        {step === 6 && event ? (
+        {/* ── Step 4: Review & Publish ─────────────────────────── */}
+        {step === 4 && event ? (
           <div className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 6 of 6</div>
+              <div className="wizard-step-badge-pill">Step 4 of 4</div>
               <h3>Review &amp; Publish</h3>
-              <p className="hint">Everything looks good? Publish your event to go live.</p>
+              <p className="hint">Review your complete event configuration before publishing to attendees.</p>
             </div>
 
             <div className="wizard-section">
@@ -1199,38 +1290,38 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   <strong>{info.title}</strong>
                 </div>
                 <div className="detail-card">
+                  <div className="label">Format &amp; Mode</div>
+                  <strong>{info.eventMode === "online" ? "🌐 Online Event" : "📍 In-Person Event"}</strong>
+                </div>
+                <div className="detail-card">
+                  <div className="label">Pricing Model</div>
+                  <strong>{info.eventType === "free" ? "🎉 Free Event" : `💳 Paid Event · ${formatCurrency(info.price)}`}</strong>
+                </div>
+                <div className="detail-card">
                   <div className="label">Date &amp; Time</div>
                   <strong>
-                    {info.date || "No date"} · {info.timeHour}:{info.timeMinute} {info.timePeriod}
+                    {info.date || "TBD"} · {info.timeHour}:{info.timeMinute} {info.timePeriod}
                   </strong>
                 </div>
                 <div className="detail-card">
-                  <div className="label">Venue</div>
-                  <strong>{info.venue || "—"}</strong>
+                  <div className="label">{info.eventMode === "online" ? "Meeting URL" : "Venue"}</div>
+                  <strong>{info.eventMode === "online" ? (info.onlineUrl || "—") : (info.venue || "—")}</strong>
                 </div>
                 <div className="detail-card">
                   <div className="label">Capacity</div>
-                  <strong>{capacity.capacity} seats</strong>
+                  <strong>{info.capacity} seats</strong>
                 </div>
                 <div className="detail-card">
-                  <div className="label">Ticket Price</div>
-                  <strong>{capacity.price === 0 ? "Free" : formatCurrency(capacity.price)}</strong>
-                </div>
-                <div className="detail-card">
-                  <div className="label">Custom Fields</div>
-                  <strong>{fields.length} field{fields.length !== 1 ? "s" : ""}</strong>
+                  <div className="label">Registration Fields</div>
+                  <strong>{fields.length} custom field{fields.length !== 1 ? "s" : ""}</strong>
                 </div>
                 <div className="detail-card">
                   <div className="label">Booked Seats</div>
                   <strong>{event.attendees}</strong>
                 </div>
                 <div className="detail-card">
-                  <div className="label">Fill Rate</div>
-                  <strong>{event.capacity ? Math.round((event.attendees / event.capacity) * 100) : 0}%</strong>
-                </div>
-                <div className="detail-card">
-                  <div className="label">Revenue</div>
-                  <strong>{formatCurrency(event.attendees * event.price)}</strong>
+                  <div className="label">Status</div>
+                  <strong style={{ textTransform: "capitalize" }}>{details.status}</strong>
                 </div>
               </div>
             </div>
@@ -1238,16 +1329,16 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
             {event.slug ? (
               <div className="wizard-section">
                 <div className="wizard-section-title">
-                  <FontAwesomeIcon icon={faGlobe} /> Public Booking URL
+                  <FontAwesomeIcon icon={faGlobe} /> Public Booking Link
                 </div>
                 <div className="share-url-box">
-                  <span style={{ flex: 1 }}>{getEventLinkAbsolute(event)}</span>
+                  <span style={{ flex: 1, wordBreak: "break-all" }}>{getEventLinkAbsolute(event)}</span>
                   <button type="button" className="icon-btn" onClick={copyShareLink} aria-label="Copy link">
                     <FontAwesomeIcon icon={faCopy} />
                   </button>
                 </div>
                 <div className="hint" style={{ marginTop: 6 }}>
-                  Guests can book through this link directly, or after signing in.
+                  Share this link with attendees. Free registrations require no payment.
                 </div>
                 <button
                   type="button"
@@ -1260,16 +1351,15 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               </div>
             ) : (
               <div className="hint" style={{ margin: "12px 0" }}>
-                Publishing generates a unique booking URL like{" "}
-                <code>myapp.com/events/{"{slug}"}</code>.
+                Publishing generates a live booking URL for attendees to register.
               </div>
             )}
 
             <EventDashboardSummary eventId={event.id} />
-            {event.isOwner !== false && <SharedMembersPanel eventId={event.id} onToast={onToast} />}
+            {event.isOwner !== false && <SharedMembersPanel eventId={event.id} isFree={info.eventType === "free" || info.price <= 0} onToast={onToast} />}
 
             <div className="wizard-foot">
-              <button className="btn btn-ghost" type="button" onClick={() => goToStep(5)}>
+              <button className="btn btn-ghost" type="button" onClick={() => goToStep(3)}>
                 <FontAwesomeIcon icon={faArrowLeft} /> Back
               </button>
               <div className="btn-row">

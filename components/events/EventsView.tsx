@@ -103,7 +103,7 @@ export function EventsView({ onToast }: EventsViewProps) {
   };
 
   const handleDelete = async (event: EventItem) => {
-    const res = await Swal.confirm(`Delete "${event.title}"?`, "This event will be permanently deleted.");
+    const res = await Swal.confirm("Are you sure want to delete", `Event "${event.title}" will be permanently deleted.`);
     if (!res.isConfirmed) return;
     try {
       await removeEvent(event.id);
@@ -356,7 +356,7 @@ export function EventsView({ onToast }: EventsViewProps) {
 
                     {/* Price */}
                     <td style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: 14, color: "var(--text)", whiteSpace: "nowrap" }}>
-                      {event.price > 0 ? formatCurrency(event.price) : <span style={{ color: "var(--success)", fontWeight: 600, fontSize: 12 }}>Free</span>}
+                      {event.eventType === "paid" ? formatCurrency(event.price) : <span style={{ color: "var(--success)", fontWeight: 600, fontSize: 12 }}>Free</span>}
                     </td>
 
                     {/* Status */}
@@ -459,7 +459,7 @@ export function EventsView({ onToast }: EventsViewProps) {
             </div>
             {/* Modal body — scrollable */}
             <div style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}>
-              <SharedMembersPanel eventId={shareEventTarget.id} onToast={onToast} />
+              <SharedMembersPanel eventId={shareEventTarget.id} isFree={shareEventTarget.eventType === "free" || shareEventTarget.price <= 0} onToast={onToast} />
             </div>
           </div>
         </div>

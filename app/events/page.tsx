@@ -46,7 +46,7 @@ export default function PublicEventsLandingPage() {
   );
 
   const totalEvents = events.length;
-  const freeEvents = events.filter((e) => e.price === 0).length;
+  const freeEvents = events.filter((e) => e.eventType === "free").length;
   const upcomingEvents = events.filter((e) => parseEventDate(e.date).getTime() > Date.now()).length;
 
   return (
@@ -159,7 +159,7 @@ export default function PublicEventsLandingPage() {
                   <span className="badge completed">Completed</span>
                 ) : (
                   <span className="price-badge">
-                    {event.price > 0 ? `₹${event.price.toLocaleString()}` : "Free"}
+                    {event.eventType === "paid" ? `₹${event.price.toLocaleString()}` : "Free"}
                   </span>
                 )}
               </div>
@@ -180,7 +180,7 @@ export default function PublicEventsLandingPage() {
                 </div>
                 <div className="price-row">
                   <span className="price">
-                    {event.price > 0 ? `₹${event.price.toLocaleString()}` : "Free Entry"}
+                    {event.eventType === "paid" ? `₹${event.price.toLocaleString()}` : "Free Entry"}
                   </span>
                   <span className="register-arrow">
                     {event.status === "completed" ? (

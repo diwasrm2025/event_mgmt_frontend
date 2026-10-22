@@ -31,7 +31,8 @@ import {
   type SharedMember,
 } from "@/lib/rbac";
 
-const CAPABILITIES: EventCapability[] = ["VIEW", "EDIT", "PAYMENT_APPROVE", "ATTENDEE"];
+const ALL_CAPABILITIES: EventCapability[] = ["VIEW", "EDIT", "PAYMENT_APPROVE", "ATTENDEE"];
+const FREE_CAPABILITIES: EventCapability[] = ["VIEW", "EDIT", "ATTENDEE"];
 
 function initialsOf(name: string) {
   return (name || "?")
@@ -42,7 +43,16 @@ function initialsOf(name: string) {
     .join("");
 }
 
-export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onToast: (message: string) => void }) {
+export function SharedMembersPanel({
+  eventId,
+  isFree = false,
+  onToast,
+}: {
+  eventId: string;
+  isFree?: boolean;
+  onToast: (message: string) => void;
+}) {
+  const CAPABILITIES = isFree ? FREE_CAPABILITIES : ALL_CAPABILITIES;
   const [members, setMembers] = useState<SharedMember[] | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -67,6 +77,15 @@ export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onTo
   const [newPassword, setNewPassword] = useState("");
 
   const [sharePermissions, setSharePermissions] = useState<EventCapability[]>(["VIEW"]);
+
+  // Strip PAYMENT_APPROVE from existing sharePermissions if event becomes free
+  const safeSharePermissions = isFree ? sharePermissions.filter((p) => p !== "PAYMENT_APPROVE") : sharePermissions;
+  const setSafeSharePermissions = (updater: (current: EventCapability[]) => EventCapability[]) => {
+    setSharePermissions((current) => {
+      const next = updater(current);
+      return isFree ? next.filter((p) => p !== "PAYMENT_APPROVE") : next;
+    });
+  };
   const [sharing, setSharing] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -134,13 +153,13 @@ export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onTo
 
   // Share with Existing User
   const handleShareExisting = async (target: { userId?: string; email?: string }, label: string) => {
-    if (sharePermissions.length === 0) {
+    if (safeSharePermissions.length === 0) {
       onToast("Choose at least one permission to grant.");
       return;
     }
     setSharing(true);
     try {
-      await shareEvent(eventId, target, sharePermissions);
+      await shareEvent(eventId, target, safeSharePermissions);
       onToast(`Shared access with ${label}.`);
       setShareQuery("");
       setSelectedUser(null);
@@ -171,7 +190,7 @@ export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onTo
       onToast("Enter a valid email address (e.g. user@gmail.com).");
       return;
     }
-    if (sharePermissions.length === 0) {
+    if (safeSharePermissions.length === 0) {
       onToast("Choose at least one permission to grant.");
       return;
     }
@@ -180,7 +199,7 @@ export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onTo
       await createUserAndShareEvent(
         eventId,
         { name: trimmedName, email: trimmedEmail, password },
-        sharePermissions,
+        safeSharePermissions,
       );
       onToast(`Created account & shared access with "${trimmedEmail}".`);
       setNewName("");
@@ -368,11 +387,11 @@ export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onTo
           <label>Permissions to grant</label>
           <div className="capability-picker">
             {CAPABILITIES.map((capability) => (
-              <label key={capability} className={`capability-chip ${sharePermissions.includes(capability) ? "active" : ""}`}>
+              <label key={capability} className={`capability-chip ${safeSharePermissions.includes(capability) ? "active" : ""}`}>
                 <input
                   type="checkbox"
-                  checked={sharePermissions.includes(capability)}
-                  onChange={() => setSharePermissions((current) => togglePermission(current, capability))}
+                  checked={safeSharePermissions.includes(capability)}
+                  onChange={() => setSafeSharePermissions((current) => togglePermission(current, capability))}
                 />
                 <span>
                   <strong style={{marginLeft:'5px'}}>{EVENT_CAPABILITY_LABELS[capability]}</strong>
@@ -411,6 +430,8 @@ export function SharedMembersPanel({ eventId, onToast }: { eventId: string; onTo
               {EVENT_CAPABILITY_LABELS[c]}
             </option>
           ))}
+          {/* Always allow filtering by PAYMENT_APPROVE even on free events to see old grants */}
+          {isFree && <option value="PAYMENT_APPROVE">{EVENT_CAPABILITY_LABELS["PAYMENT_APPROVE"]}</option>}
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "ALL" | "ACTIVE" | "REMOVED")} aria-label="Filter by status">
           <option value="ACTIVE">Active</option>

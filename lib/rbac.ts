@@ -31,7 +31,7 @@ export type EventCapability = "VIEW" | "ATTENDEE" | "EDIT" | "PAYMENT_APPROVE";
 
 export const EVENT_CAPABILITY_LABELS: Record<EventCapability, string> = {
   VIEW: "View",
-  ATTENDEE: "Attendee Management",
+  ATTENDEE: "Attendance Management",
   EDIT: "Edit",
   PAYMENT_APPROVE: "Payment Approve",
 };
@@ -71,6 +71,7 @@ export interface SystemEvent {
   venue: string;
   capacity: number;
   attendees: number;
+  eventType: "free" | "paid";
   price: number;
   status: string;
   description: string;
@@ -105,6 +106,18 @@ export function deleteRole(id: string) {
 // --- Users --------------------------------------------------------------
 export function listUsers() {
   return apiRequest<AdminUser[]>("/users");
+}
+
+export function createUser(input: { name: string; email: string; password: string; roleId?: string }) {
+  return apiRequest<AdminUser>("/users", { method: "POST", body: input });
+}
+
+export function deleteUser(userId: string) {
+  return apiRequest<{ success: boolean; message: string }>(`/users/${userId}`, { method: "DELETE" });
+}
+
+export function createOrganizer(input: { name: string; email: string; password: string }) {
+  return apiRequest<AdminUser>("/users/organizers", { method: "POST", body: input });
 }
 
 export function assignUserRole(userId: string, roleId: string) {

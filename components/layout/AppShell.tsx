@@ -256,7 +256,7 @@ export function AppShell({
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               ))}
-              {user?.role === "SUPER_ADMIN" || user?.permissions.includes("events:manage_all") ? (
+              {user?.role === "SUPER_ADMIN" ? (
                 <Link
                   href="/super-admin"
                   title="Super Admin Portal"
@@ -265,16 +265,6 @@ export function AppShell({
                 >
                   <FontAwesomeIcon icon={faUserShield} />
                   {!collapsed && <span>Super Admin</span>}
-                </Link>
-              ) : user?.permissions.includes("users:manage") || user?.permissions.includes("roles:manage") ? (
-                <Link
-                  href="/dashboard/admin"
-                  title="Admin"
-                  className={`side-link ${collapsed ? "icon-only" : ""} ${currentPath.startsWith("/dashboard/admin") ? "active" : ""}`}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <FontAwesomeIcon icon={faUserShield} />
-                  {!collapsed && <span>Admin</span>}
                 </Link>
               ) : null}
             </div>

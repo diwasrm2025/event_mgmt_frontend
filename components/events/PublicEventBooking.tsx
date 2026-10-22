@@ -28,6 +28,7 @@ import { Loader } from "@/components/ui/Loader";
 import { getSession } from "@/lib/auth";
 import {
   CATEGORY_COLORS,
+  PAYMENT_STATUS_LABELS,
   createBooking,
   formatCurrency,
   formatDateLabel,
@@ -92,8 +93,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   /*
    * Check payment/registration status
    *
-   * This remains useful for SBI ePay because the SBI callback
-   * may update the booking after the user returns to the application.
+   * Refresh the receipt after an authorized reviewer approves or rejects payment.
    */
   useEffect(() => {
     if (!receipt || receipt.paymentStatus !== "pending") {
@@ -188,7 +188,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     event.capacity - event.attendees,
   );
 
-  const isFree = event.price <= 0;
+  const isFree = event.eventType === "free";
 
   const soldOut =
     event.status === "sold-out" ||
@@ -213,10 +213,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
    * Registration details validation
    */
   function reportDetailsError(message: string) {
-    setNotice({
-      title: "Please check your details",
-      message,
-    });
+    setError(message);
   }
 
   /*
@@ -227,9 +224,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
     setError("");
 
-    if (!name.trim() || !email.trim()) {
+    if (!name.trim() || !email.trim() || !phone.trim()) {
       return reportDetailsError(
-        "Name and email are required.",
+        "Name, email, and phone number are required.",
       );
     }
 
@@ -260,25 +257,14 @@ export function PublicEventBooking({ slug }: { slug: string }) {
       }
     }
 
+    if (isFree) {
+      void placeBooking();
+      return;
+    }
     setStage("payment");
   }
 
-  /*
-   * Create booking / start payment
-   *
-   * FREE:
-   *     create normal free booking
-   *
-   * PAID:
-   *     create SBI ePay booking
-   *
-   * The backend will eventually return the SBI
-   * transaction URL. At that point this function
-   * will redirect the browser to SBI ePay.
-   */
-  async function handlePay(e: FormEvent) {
-    e.preventDefault();
-
+  async function placeBooking() {
     if (submitting) {
       return;
     }
@@ -299,38 +285,18 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                 paymentMethod: "sbiepay" as const,
               }),
         });
-        console.log("SBI booking result:", result);
-
-        const booking = result.booking;
-
-        if (!isFree && result.transactionUrl) {
-          window.location.href = result.transactionUrl;
-          return;
-        }
-      /*
-       * Temporary:
-       * createBooking currently returns BookingItem.
-       *
-       * Once the backend SBI integration is completed,
-       * createBooking will return:
-       *
-       * {
-       *   booking: BookingItem;
-       *   transactionUrl: string;
-       * }
-       *
-       * and we will redirect to SBI here.
-       */
+      const booking = result.booking;
+      if (!isFree && result.transactionUrl) { window.location.assign(result.transactionUrl); return; }
 
       setReceipt(booking);
       setStage("success");
 
-      setNotice({
-        title: isFree
-          ? "Congratulations!"
-          : "Payment initiated",
-        success: true,
-      });
+      if (!isFree) {
+        setNotice({
+          title: "Payment verification pending",
+          success: true,
+        });
+      }
     } catch (err) {
       const message =
         err instanceof Error
@@ -339,15 +305,15 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
       setError(message);
 
-      setNotice({
-        title: "Submission failed",
-        message,
-      });
-
-      setStage("payment");
+      setStage(isFree ? "details" : "payment");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handlePay(e: FormEvent) {
+    e.preventDefault();
+    await placeBooking();
   }
 
   return (
@@ -516,10 +482,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     />
 
                     <Field
-                      label="Phone (optional)"
+                      label="Phone Number"
                       value={phone}
                       onChange={setPhone}
                       type="tel"
+                      required
                     />
 
                     {(event.fields ?? []).map(
@@ -538,12 +505,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     <button
                       className="btn btn-vibrant"
                       type="submit"
+                      disabled={submitting}
                     >
-                      Continue to{" "}
-                      {isFree
-                        ? "review"
-                        : "payment"}
+                      {isFree ? "Register for free" : "Continue to payment"}
                     </button>
+                    {error && <p className="hint" role="alert">{error}</p>}
                   </form>
                 )}
 
@@ -558,25 +524,10 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     noValidate
                   >
                     <h2>
-                      {isFree
-                        ? "Review your registration"
-                        : "Pay with SBI ePay"}
+                      Pay with SBI ePay
                     </h2>
 
-                    {!isFree && (
-                      <div className="payment-info">
-                        <p>
-                          Secure payment powered by
-                          SBI ePay.
-                        </p>
-
-                        <p>
-                          You will be redirected to
-                          the SBI ePay payment page
-                          to complete your payment.
-                        </p>
-                      </div>
-                    )}
+                    <p className="hint">You will be redirected to SBI ePay to complete payment securely.</p>
 
                     <div className="order-summary pro">
                       <div className="order-summary-row">
@@ -585,11 +536,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                         </span>
 
                         <strong>
-                          {isFree
-                            ? "Free"
-                            : formatCurrency(
-                                event.price,
-                              )}
+                          {formatCurrency(event.price)}
                         </strong>
                       </div>
 
@@ -600,24 +547,14 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                       </div>
                     </div>
 
-                    {!isFree && (
-                      <p className="hint">
-                        Click the button below to
-                        proceed to SBI ePay. Your
-                        payment will be verified
-                        automatically after the
-                        transaction.
-                      </p>
-                    )}
+                    <p className="hint">Your payment will be verified automatically using SBI Order Search before registration is confirmed.</p>
 
                     <button
                       className="btn btn-vibrant"
                       type="submit"
                       disabled={submitting}
                     >
-                      {isFree
-                        ? "Confirm registration"
-                        : "Proceed to Payment"}
+                      Proceed to SBI ePay
                     </button>
 
                     <button
@@ -655,7 +592,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     <strong>
                       {isFree
                         ? "Completing your registration..."
-                        : "Creating your SBI ePay payment..."}
+                        : "Starting your SBI ePay payment..."}
                     </strong>
                   </div>
                 )}
@@ -690,15 +627,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
           {notice.success && receipt ? (
             <>
               <p>
-                {isFree
-                  ? "Your registration is complete!"
-                  : "Your SBI ePay payment has been initiated."}
+                Your order has been saved, but SBI checkout could not be opened.
               </p>
 
               <p>
-                {isFree
-                  ? "Thank you for registering!"
-                  : "Complete the payment on the SBI ePay payment page. Your payment status will be updated after SBI confirms the transaction."}
+                We will verify the order automatically. Save your status link and check your booking before starting another payment.
               </p>
 
               <PaymentStatusActions
@@ -756,35 +689,45 @@ function BookingSteps({
   stage: Stage;
   isFree: boolean;
 }) {
+  const steps: [number, string][] = isFree
+    ? [
+        [1, "Details"],
+        [2, "Confirmed"],
+      ]
+    : [
+        [1, "Details"],
+        [2, "Payment"],
+        [3, "Complete"],
+      ];
+
   const current =
     stage === "details"
       ? 1
-      : stage === "success"
-        ? 3
-        : 2;
+      : isFree
+        ? 2
+        : stage === "payment"
+          ? 2
+          : 3;
 
   return (
     <nav
       className="booking-step-nav"
+      style={isFree ? { gridTemplateColumns: "repeat(2, 1fr)" } : undefined}
       aria-label="Booking progress"
     >
-      {[
-        [1, "Details"],
-        [2, isFree ? "Review" : "Payment"],
-        [3, isFree ? "Complete" : "Payment"],
-      ].map(([n, label]) => (
+      {steps.map(([n, label]) => (
         <div
           className={`booking-step ${
             current === n
               ? "active"
-              : current > Number(n)
+              : current > n
                 ? "complete"
                 : ""
           }`}
           key={String(n)}
         >
           <span>
-            {current > Number(n)
+            {current > n
               ? "✓"
               : n}
           </span>
@@ -981,8 +924,9 @@ function SuccessReceipt({
   >;
   receipt: BookingItem;
 }) {
-  const isPaid =
-    receipt.paymentStatus === "paid";
+  const isFree = event.eventType === "free";
+  const paymentCompleted = receipt.paymentStatus === "paid";
+  const isPaid = paymentCompleted && receipt.registrationStatus === "approved";
 
   const isRejected =
     receipt.registrationStatus ===
@@ -992,7 +936,7 @@ function SuccessReceipt({
     <div className="ticket-stub-wrap">
       <div
         className={`payment-review-banner ${
-          isPaid
+          paymentCompleted
             ? "is-completed"
             : isRejected
               ? "is-rejected"
@@ -1005,26 +949,24 @@ function SuccessReceipt({
 
         {" "}
 
-        {isPaid
-          ? "Registration completed!"
-          : isRejected
-            ? "Payment could not be approved"
-            : "Payment awaiting confirmation"}
+        {isFree ? "Registration confirmed" : PAYMENT_STATUS_LABELS[receipt.paymentStatus]}
       </div>
 
       <p className="event-sub">
-        {isPaid
-          ? "Thank you for registering."
+        {isFree
+          ? "Your free registration is confirmed! A confirmation email with your ticket details has been sent to your email address."
+          : isPaid
+          ? "Thank you for registering. A confirmation email with your ticket has been sent to your email address."
           : isRejected
             ? "Please contact the organizer about your payment."
-            : "Your payment is being processed. The booking status will update after payment confirmation."}
+            : paymentCompleted
+              ? receipt.rejectionReason || "Payment is completed. Please contact the organizer about your registration."
+              : "SBI ePay verification is pending. Save your private status link below to track your payment."}
       </p>
 
-      <PaymentStatusActions
-        href={paymentStatusLink(receipt)}
-      />
+      {!isFree && <PaymentStatusActions href={paymentStatusLink(receipt)} />}
 
-      {isRejected &&
+      {!isFree && isRejected &&
         receipt.rejectionReason && (
           <p className="payment-review-banner is-rejected">
             Reason:{" "}
@@ -1050,15 +992,9 @@ function SuccessReceipt({
         <div className="ticket-stub-body">
           <strong>{receipt.name}</strong>
 
-          <span>
-            {isPaid
-              ? "Payment completed"
-              : isRejected
-                ? "Payment rejected"
-                : "Payment pending confirmation"}
-          </span>
+          <span>{isFree ? "Free registration confirmed" : PAYMENT_STATUS_LABELS[receipt.paymentStatus]}</span>
 
-          {isPaid &&
+          {(isPaid || isFree) &&
             event.eventMode ===
               "online" &&
             event.onlineUrl && (
