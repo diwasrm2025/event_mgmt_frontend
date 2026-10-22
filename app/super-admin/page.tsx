@@ -790,7 +790,7 @@ function RoleModal({
    PAYMENT RECEIVING ACCOUNT TAB (SUPER ADMIN EXCLUSIVE)
    ========================================================================= */
 function PaymentAccountTab({ onToast }: { onToast: (msg: string) => void }) {
-  const [accountName, setAccountName] = useState("Pulseframe Events Private Limited");
+  const [accountName, setAccountName] = useState("Trichy SRM Events Private Limited");
   const [bankName, setBankName] = useState("HDFC Bank");
   const [accountNumber, setAccountNumber] = useState("50100293848192");
   const [ifscCode, setIfscCode] = useState("HDFC0000128");

@@ -4,7 +4,7 @@ import "./globals.css";
 import { themeBootstrapScript } from "@/lib/themePrefs";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 export const metadata: Metadata = {
-  title: "Pulseframe Events",
+  title: "Trichy SRM Events",
   description: "A polished event booking and analytics studio with theme controls and unique event URLs.",
 };
 

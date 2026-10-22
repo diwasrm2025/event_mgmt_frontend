@@ -226,7 +226,7 @@ export function AppShell({
           {/* Brand */}
           <div className="side-brand">
             <span className="dot" />
-            {!collapsed && <span className="brand-name">SRM Events</span>}
+            {!collapsed && <span className="brand-name">Trichy SRM Events</span>}
           </div>
 
           {/* Collapse toggle */}
