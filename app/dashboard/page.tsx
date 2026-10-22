@@ -1,6 +1,5 @@
 "use client";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";

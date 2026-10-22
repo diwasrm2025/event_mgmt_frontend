@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getEventBookings, PAYMENT_STATUS_LABELS, getAdminEventLink, formatCurrency, type EventItem, type RosterBooking, type RosterAccess } from "@/lib/events";
 import { toggleAttendeeCheckIn, updateRegistrationStatus } from "@/lib/rbac";
@@ -14,13 +14,13 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true); setError("");
     try { const result = await getEventBookings(event.id); setAccess(result.capabilities); setBookings(result.items); }
     catch (err) { setError(err instanceof Error ? err.message : "Could not load attendees."); }
     finally { setLoading(false); }
-  }
-  useEffect(() => { void load(); }, [event.id]);
+  }, [event.id]);
+  useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (busy) return;
     let active = true;

@@ -6,9 +6,13 @@ import { PaymentStatusActions } from "@/components/payments/PaymentStatusActions
 import { PaymentNotice } from "@/components/payments/PaymentNotice";
 import { paymentStatusLink } from "@/lib/payment-status";
 import Link from "next/link";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { isValidEmail, isValidPhone, validateRegistrationField } from "@/lib/event-validation";
 import {
   useEffect,
   useMemo,
+  useRef,
+  useId,
   useState,
   type CSSProperties,
   type FormEvent,
@@ -76,6 +80,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const bookingInFlight = useRef(false);
 
   const [notice, setNotice] = useState<{
     title: string;
@@ -87,7 +92,14 @@ export function PublicEventBooking({ slug }: { slug: string }) {
    * Load public event
    */
   useEffect(() => {
-    void getPublicEvent(slug).then(setEvent);
+    let active = true;
+    setEvent(undefined);
+    setStage("details");
+    setReceipt(null);
+    setResponses({});
+    setError("");
+    void getPublicEvent(slug).then((loaded) => { if (active) setEvent(loaded); });
+    return () => { active = false; };
   }, [slug]);
 
   /*
@@ -96,7 +108,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
    * Refresh the receipt after an authorized reviewer approves or rejects payment.
    */
   useEffect(() => {
-    if (!receipt || receipt.paymentStatus !== "pending") {
+    const bookingId = receipt?.id;
+    const accessToken = receipt?.paymentAccessToken;
+    if (!bookingId || receipt?.paymentStatus !== "pending" || !accessToken) {
       return;
     }
 
@@ -112,11 +126,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
             | "rejectionReason"
           >
         >(
-          `/public/bookings/${receipt.id}/payment-status`,
+          `/public/bookings/${bookingId}/payment-status`,
           {
             auth: false,
             query: {
-              token: receipt.paymentAccessToken,
+              token: accessToken,
             },
           },
         );
@@ -194,7 +208,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     event.status === "sold-out" ||
     (event.capacity > 0 && seatsLeft === 0);
 
-  const closed = event.status === "completed";
+  const closed = event.status !== "published" && event.status !== "sold-out";
 
   /*
    * Update dynamic registration field
@@ -224,37 +238,21 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
     setError("");
 
-    if (!name.trim() || !email.trim() || !phone.trim()) {
+    if (name.trim().length < 2 || !email.trim() || !phone.trim()) {
       return reportDetailsError(
-        "Name, email, and phone number are required.",
+        "Enter a name with at least 2 characters, email, and phone number.",
       );
     }
 
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        email.trim(),
-      )
-    ) {
-      return reportDetailsError(
-        "Enter a valid email address.",
-      );
+    if (!isValidEmail(email)) return reportDetailsError("Enter a valid email address.");
+    if (!isValidPhone(phone)) return reportDetailsError("Enter a valid phone number with 7 to 15 digits.");
+    if (closed || soldOut) return reportDetailsError("Registration is unavailable for this event.");
+    if (!isFree && (!Number.isFinite(bookedEvent.price) || bookedEvent.price <= 0)) {
+      return reportDetailsError("Ticket pricing is unavailable. Please contact the organizer.");
     }
-
     for (const field of bookedEvent.fields ?? []) {
-      const value = responses[field.name];
-
-      if (
-        field.required &&
-        (
-          field.type === "checkbox"
-            ? value !== true
-            : value === undefined || value === ""
-        )
-      ) {
-        return reportDetailsError(
-          `"${field.label}" is required.`,
-        );
-      }
+      const message = validateRegistrationField(field, responses[field.name]);
+      if (message) return reportDetailsError(message);
     }
 
     if (isFree) {
@@ -265,10 +263,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   }
 
   async function placeBooking() {
-    if (submitting) {
+    if (bookingInFlight.current) {
       return;
     }
 
+    bookingInFlight.current = true;
     setError("");
     setSubmitting(true);
     setStage("processing");
@@ -278,7 +277,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim() || undefined,
-          responses,
+          responses: Object.fromEntries(Object.entries(responses).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])),
           ...(isFree
             ? {}
             : {
@@ -286,9 +285,17 @@ export function PublicEventBooking({ slug }: { slug: string }) {
               }),
         });
       const booking = result.booking;
-      if (!isFree && result.transactionUrl) { window.location.assign(result.transactionUrl); return; }
-
       setReceipt(booking);
+      if (!isFree && result.transactionUrl) {
+        try {
+          const checkout = new URL(result.transactionUrl, window.location.origin);
+          if (!["http:", "https:"].includes(checkout.protocol)) throw new Error("Invalid checkout URL");
+          window.location.assign(checkout.href);
+          return;
+        } catch {
+          // Keep the saved order and its status link available if navigation fails.
+        }
+      }
       setStage("success");
 
       if (!isFree) {
@@ -307,6 +314,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
       setStage(isFree ? "details" : "payment");
     } finally {
+      bookingInFlight.current = false;
       setSubmitting(false);
     }
   }
@@ -574,7 +582,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     </button>
 
                     {error && (
-                      <p className="hint">
+                      <p className="hint" role="alert">
                         {error}
                       </p>
                     )}
@@ -661,7 +669,7 @@ function Detail({
   label,
   value,
 }: {
-  icon: any;
+  icon: IconDefinition;
   label: string;
   value: string;
 }) {
@@ -756,9 +764,10 @@ function Field({
   type?: string;
   required?: boolean;
 }) {
+  const id = useId();
   return (
     <div className="field">
-      <label>
+      <label htmlFor={id}>
         {label}
 
         {required && (
@@ -770,6 +779,7 @@ function Field({
       </label>
 
       <input
+        id={id}
         type={type}
         value={value}
         placeholder={`Enter ${label
@@ -800,6 +810,16 @@ function RegistrationField({
     value: string | boolean,
   ) => void;
 }) {
+  const id = useId();
+  if (field.type === "textarea") {
+    return (
+      <div className="field">
+        <label htmlFor={id}>{field.label}{field.required ? " *" : ""}</label>
+        <textarea id={id} value={String(value ?? "")} required={field.required}
+          onChange={(e) => onChange(field, e.target.value)} rows={4} />
+      </div>
+    );
+  }
   if (field.type === "checkbox") {
     return (
       <label className="registration-checkbox">
@@ -900,6 +920,7 @@ function RegistrationField({
       onChange={(v) =>
         onChange(field, v)
       }
+      required={field.required}
       type={
         field.type === "phone"
           ? "tel"

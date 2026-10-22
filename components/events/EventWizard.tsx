@@ -56,6 +56,7 @@ import {
   type EventStatus,
   type FieldType,
 } from "@/lib/events";
+import { isValidCapacity, isValidDate, isValidHttpUrl, isValidTicketPrice } from "@/lib/event-validation";
 import { getApiBaseUrl } from "@/lib/api";
 import { EventBannerSlider } from "./EventBannerSlider";
 import { SharedMembersPanel } from "./SharedMembersPanel";
@@ -189,7 +190,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     eventType: "free",
     price: 0,
   });
-  const [details, setDetails] = useState<DetailsForm>({ status: "draft", featured: false, agenda: "" });
+  const [details, setDetails] = useState<DetailsForm>({ status: "published", featured: false, agenda: "" });
 
   const [fields, setFields] = useState<EventFormFieldItem[]>([]);
   const [newField, setNewField] = useState<NewFieldForm>(emptyNewField());
@@ -215,7 +216,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       eventType: evtType,
       price: loaded.price,
     });
-    setDetails({ status: loaded.status, featured: loaded.featured, agenda: loaded.agenda.join("\n") });
+    setDetails({ status: !loaded.slug && loaded.status === "draft" ? "published" : loaded.status, featured: loaded.featured, agenda: loaded.agenda.join("\n") });
     setFields((loaded.fields ?? []).slice().sort((a, b) => a.order - b.order));
     setMaxStepReached((current) => Math.max(current, loaded.slug ? 4 : Math.min(loaded.wizardStep || 1, 4)));
   }, []);
@@ -241,7 +242,11 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   }, [eventId, hydrateFromEvent]);
 
   const goToStep = (target: number) => {
-    if (target > maxStepReached) return;
+    if (target > maxStepReached || saving || uploadingBanner || savingField) return;
+    if (target > step && (step === 1 || step === 2)) {
+      setError("Save this step using Continue before moving forward.");
+      return;
+    }
     setStep(target);
     setError("");
     setStepErrors({});
@@ -256,19 +261,21 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const validateStep1 = (): Record<string, string> => {
     const errs: Record<string, string> = {};
-    if (!info.title.trim()) errs.title = "Event title is required.";
-    if (!info.date) errs.date = "Please select an event date.";
-    if (info.eventMode === "online" && !info.onlineUrl.trim()) errs.onlineUrl = "Online event link is required.";
+    if (info.title.trim().length < 2) errs.title = "Event title must be at least 2 characters.";
+    if (!isValidDate(info.date)) errs.date = "Please select a valid event date.";
+    if (info.eventMode === "online" && !isValidHttpUrl(info.onlineUrl)) errs.onlineUrl = "Enter a valid http or https meeting URL.";
     if (info.eventMode === "offline" && !info.venue.trim()) errs.venue = "Venue location is required.";
-    if (!info.capacity || info.capacity < 1) errs.capacity = "Total seats must be at least 1.";
-    if (info.eventType === "paid" && (!info.price || info.price <= 0)) {
-      errs.price = "Paid events must have a ticket price greater than zero.";
+    if (!isValidCapacity(info.capacity)) errs.capacity = "Total seats must be a whole number between 1 and 2,147,483,647.";
+    else if (info.capacity < (event?.attendees ?? 0)) errs.capacity = "Total seats cannot be fewer than booked seats.";
+    if (info.eventType === "paid" && !isValidTicketPrice(info.price)) {
+      errs.price = "Enter a ticket price greater than zero with at most two decimal places.";
     }
     return errs;
   };
 
   const submitInfo = async (formEvent: FormEvent) => {
     formEvent.preventDefault();
+    if (saving) return;
     const errs = validateStep1();
     if (Object.keys(errs).length) {
       setStepErrors(errs);
@@ -281,6 +288,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       let current = event;
       if (!current) {
         current = await createDraftEvent(info.title.trim());
+        setEvent(current);
       }
       const time24 = to24HrTime(info.timeHour, info.timeMinute, info.timePeriod);
       const updated = await updateEvent(current.id, {
@@ -290,8 +298,8 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         date: info.date,
         time: time24,
         eventMode: info.eventMode,
-        onlineUrl: info.onlineUrl.trim(),
-        venue: info.venue.trim(),
+        onlineUrl: info.eventMode === "online" ? info.onlineUrl.trim() : "",
+        venue: info.eventMode === "offline" ? info.venue.trim() : "",
         host: info.host.trim() || "Organizer",
         capacity: Number(info.capacity),
         eventType: info.eventType,
@@ -310,18 +318,23 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   const [bannerDragActive, setBannerDragActive] = useState(false);
 
   const handleBannerFiles = async (files: FileList | File[] | File | undefined | null) => {
-    if (!files || !event) return;
+    if (!files || !event || uploadingBanner) return;
     const fileList = files instanceof File ? [files] : Array.from(files);
     if (!fileList.length) return;
     setUploadingBanner(true);
     try {
       let latestEvent = event;
       for (const file of fileList) {
-        if (!file.type.startsWith("image/")) {
-          onToast(`Skipped ${file.name}: only image files are allowed.`);
+        if (!/\.(jpe?g|png|webp|gif)$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+          onToast(`Skipped ${file.name}: use JPG, PNG, WebP or GIF images up to 5 MB.`);
           continue;
         }
+        if ((latestEvent.banners ?? []).length >= 8) {
+          onToast("You can add up to 8 banner images.");
+          break;
+        }
         latestEvent = await uploadEventBanner(latestEvent.id, file);
+        setEvent((current) => ({ ...latestEvent, isOwner: current?.isOwner, sharedPermissions: current?.sharedPermissions }));
       }
       setEvent((c) => ({ ...latestEvent, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
       onToast("Photo(s) added.");
@@ -347,7 +360,11 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const submitDetails = async (formEvent: FormEvent) => {
     formEvent.preventDefault();
-    if (!event) return;
+    if (!event || saving || uploadingBanner) return;
+    if (details.agenda.split("\n").filter((line) => line.trim()).length > 30) {
+      setError("Add no more than 30 agenda items.");
+      return;
+    }
     setError("");
     setSaving(true);
     try {
@@ -399,19 +416,19 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       onToast("Give the field a label.");
       return;
     }
+    const options = [...new Set(newField.options.split(",").map((option) => option.trim()).filter(Boolean))];
+    if (["select", "radio"].includes(newField.type) && options.length < 2) {
+      onToast("Add at least two distinct options for this field.");
+      return;
+    }
+    if (savingField) return;
     setSavingField(true);
     try {
       const created = await createEventField(event.id, {
         label: newField.label.trim(),
         type: newField.type,
         required: newField.required,
-        options:
-          newField.type === "select" || newField.type === "radio"
-            ? newField.options
-                .split(",")
-                .map((option) => option.trim())
-                .filter(Boolean)
-            : [],
+        options: ["select", "radio"].includes(newField.type) ? options : [],
       });
       setFields((current) => [...current, created]);
       setNewField(emptyNewField());
@@ -459,6 +476,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       );
       setFields(reordered);
     } catch {
+      setFields(fields);
       onToast("Could not reorder fields.");
     }
   };
@@ -468,13 +486,13 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   };
 
   const publish = async () => {
-    if (!event) return;
+    if (!event || saving || uploadingBanner) return;
     setError("");
     setSaving(true);
     try {
       const finalized = await finalizeEvent(event.id, details.status);
       setEvent(finalized);
-      onToast(finalized.slug ? "Event published with a live booking link." : "Event saved.");
+      onToast(finalized.status === "draft" ? "Draft saved. Publish it to accept bookings." : "Event saved with a booking link.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not publish this event.");
     } finally {
@@ -486,8 +504,12 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     if (!event) return;
     const url = getEventLinkAbsolute(event);
     if (!url) return;
-    await navigator.clipboard.writeText(url);
-    onToast("Booking link copied.");
+    try {
+      await navigator.clipboard.writeText(url);
+      onToast("Booking link copied.");
+    } catch {
+      onToast("Could not copy the link. Copy it from the link box.");
+    }
   };
 
   const handleDelete = async () => {
@@ -666,8 +688,8 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                       <input
                         id="w-price"
                         type="number"
-                        min="1"
-                        step="1"
+                        min="0.01"
+                        step="0.01"
                         placeholder="e.g. 499"
                         value={info.price === 0 ? "" : info.price}
                         onFocus={(e) => e.target.select()}
@@ -780,7 +802,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                       onChange={(e) => setInfo({ ...info, timeMinute: e.target.value })}
                       aria-label="Minute"
                     >
-                      {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((m) => (
+                      {Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0")).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -851,7 +873,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setInfo({ ...info, capacity: val === "" ? 0 : Math.max(0, parseInt(val, 10) || 0) });
+                    setInfo({ ...info, capacity: val === "" ? 0 : Number(val) });
                   }}
                   className={stepErrors.capacity ? "input-error" : ""}
                 />
@@ -883,7 +905,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
             <div className="wizard-foot">
               <span />
-              <button className="btn btn-accent" type="submit" disabled={saving}>
+              <button className="btn btn-accent" type="submit" disabled={saving || uploadingBanner}>
                 {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue to Agenda &amp; Media{" "}
                 <FontAwesomeIcon icon={faArrowRight} />
               </button>
@@ -1038,7 +1060,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               <button className="btn btn-ghost" type="button" onClick={() => goToStep(1)}>
                 <FontAwesomeIcon icon={faArrowLeft} /> Back
               </button>
-              <button className="btn btn-accent" type="submit" disabled={saving}>
+              <button className="btn btn-accent" type="submit" disabled={saving || uploadingBanner}>
                 {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Continue to Registration Form{" "}
                 <FontAwesomeIcon icon={faArrowRight} />
               </button>
@@ -1369,9 +1391,9 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 <button hidden={event.isOwner === false} className="btn btn-danger-outline" type="button" onClick={handleDelete}>
                   Delete event
                 </button>
-                <button className="btn btn-accent" type="button" onClick={publish} disabled={saving}>
+                <button className="btn btn-accent" type="button" onClick={publish} disabled={saving || uploadingBanner}>
                   {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null}{" "}
-                  {event.slug ? "Save changes" : "Publish & generate link"}
+                  {event.slug ? "Save changes" : details.status === "draft" ? "Save draft & generate link" : "Publish & generate link"}
                 </button>
               </div>
             </div>
