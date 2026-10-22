@@ -204,7 +204,7 @@ export function AppShell({
 
   const currentPath = useMemo(() => pathname || "/", [pathname]);
   const activeNav = navigation.find((item) => item.href === currentPath) || navigation[0];
-  const profile = user || { name: profileName, email: "demo@pulseframe.app", avatarUrl: null, role: profileRole, permissions: [] };
+  const profile = user || { name: profileName, email: "demo@srmtrichy.app", avatarUrl: null, role: profileRole, permissions: [] };
 
   const sidebarWidth = collapsed ? "72px" : "240px";
 

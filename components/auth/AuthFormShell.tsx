@@ -64,7 +64,7 @@ export function AuthFormShell({
           <div className="auth-card">
             <div className="brand-mark-mobile">
               <span className="dot" />
-              Pulseframe
+              SRM Trichy
             </div>
             <p className="eyebrow">{eyebrow}</p>
             <h1>{title}</h1>

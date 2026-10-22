@@ -794,7 +794,7 @@ function PaymentAccountTab({ onToast }: { onToast: (msg: string) => void }) {
   const [bankName, setBankName] = useState("HDFC Bank");
   const [accountNumber, setAccountNumber] = useState("50100293848192");
   const [ifscCode, setIfscCode] = useState("HDFC0000128");
-  const [upiId, setUpiId] = useState("pulseframe@hdfcbank");
+  const [upiId, setUpiId] = useState("SRM Trichy@hdfcbank");
   const [currency, setCurrency] = useState("INR");
   const [saving, setSaving] = useState(false);
 

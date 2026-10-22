@@ -26,7 +26,7 @@ export function PageLoader({ label = "Getting things ready" }: { label?: string 
     <div className="page-loader">
       <span className="brand-mark">
         <span className="dot" />
-        Pulseframe
+        SRM Trichy
       </span>
       <Loader size={40} />
       <p>{label}</p>

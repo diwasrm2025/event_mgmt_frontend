@@ -28,7 +28,7 @@ export function PublicTopBar({ rightSlot }: { rightSlot?: React.ReactNode }) {
     <header className="public-topbar">
       <Link href="/events" className="side-brand" style={{ padding: 0 }}>
         <span className="dot" />
-            Pulseframe
+            SRM Trichy
       </Link>
 
       <div className="topbar-actions" style={{ marginLeft: "auto" }}>
