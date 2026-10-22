@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getEventBookings, PAYMENT_STATUS_LABELS, getAdminEventLink, formatCurrency, type EventItem, type RosterBooking, type RosterAccess } from "@/lib/events";
 import { toggleAttendeeCheckIn, updateRegistrationStatus } from "@/lib/rbac";
 import { Swal, notify } from "@/lib/swal";
+import { RegistrationDetailsDialog } from "./RegistrationDetailsDialog";
 
 export function EventAttendeesView({ event }: { event: EventItem }) {
   const isFreeEvent = event.eventType === "free";
@@ -14,6 +15,7 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [selectedBooking, setSelectedBooking] = useState<RosterBooking | null>(null);
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { const result = await getEventBookings(event.id); setAccess(result.capabilities); setBookings(result.items); }
@@ -75,9 +77,10 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
           <td><span className={`pay-badge ${booking.paymentStatus}`}>{PAYMENT_STATUS_LABELS[booking.paymentStatus]}</span></td>
           {access.canApprovePayment && <td>{booking.paymentMethod === "sbiepay" && <p className="hint">Verified automatically by SBI Order Search.</p>}<p className="mono">Transaction: {booking.transactionId || "Not submitted"}</p>{booking.paymentProof && <details><summary>View payment screenshot</summary><img className="roster-proof" src={booking.paymentProof} alt={`Payment screenshot for ${booking.name}`} /></details>}{booking.rejectionReason && <p className="payment-review-banner is-rejected">Reason: {booking.rejectionReason}</p>}{booking.paymentMethod !== "sbiepay" && booking.paymentStatus !== "paid" && <div className="roster-actions"><button className="btn btn-accent btn-sm" disabled={!!busy || !booking.paymentProof || !booking.transactionId} onClick={() => void review(booking, true)}>Accept payment</button><button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => void review(booking, false)}>Reject</button></div>}</td>}</>}
           {access.canCheckIn && <td><button className="btn btn-ghost btn-sm" disabled={!!busy || booking.paymentStatus !== "paid" || booking.registrationStatus !== "approved"} onClick={() => void checkIn(booking)}>{booking.checkedIn ? "Check out" : "Check in"}</button><p className="hint">{booking.checkedIn ? "Checked in" : "Not checked in"}</p></td>}
-          <td><details><summary>View form</summary><dl>{Object.entries(booking.responses || {}).map(([key, value]) => <div key={key}><dt>{event.fields?.find(f => f.name === key)?.label || key}</dt><dd>{String(value)}</dd></div>)}</dl><p className="hint">Registered {new Date(booking.createdAt).toLocaleString()}</p></details></td>
+          <td><button type="button" className="btn btn-ghost btn-sm" aria-haspopup="dialog" onClick={() => setSelectedBooking(booking)}>View form</button></td>
         </tr>) : <tr><td colSpan={columns}>No attendees match your search.</td></tr>}
       </tbody></table></div>
     </section>
+    {selectedBooking && <RegistrationDetailsDialog event={event} booking={selectedBooking} onClose={() => setSelectedBooking(null)} />}
   </div>;
 }
