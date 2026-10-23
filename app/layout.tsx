@@ -1,3 +1,4 @@
+import { ActivityFeedback } from "@/components/ui/ActivityFeedback";
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
@@ -19,7 +20,7 @@ export default function RootLayout({
         <Script id="theme-bootstrap" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeBootstrapScript() }} />
       </head>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>{children}<ActivityFeedback /></ThemeProvider>
       </body>
     </html>
   );

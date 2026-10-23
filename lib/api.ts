@@ -1,3 +1,4 @@
+import { withRequestFeedback } from "./action-feedback";
 /**
  * Every request to the backend flows through here. The backend base URL is
  * read ONLY from the environment (NEXT_PUBLIC_API_URL) — never hardcoded —
@@ -82,7 +83,7 @@ function buildQuery(query?: RequestOptions["query"]) {
  * used for banner image uploads. The browser sets the multipart boundary
  * itself, so we must NOT set a Content-Type header here.
  */
-export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const headers: Record<string, string> = {};
   const token = getToken();
@@ -113,7 +114,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
   return payload as T;
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function sendRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, formData, query, auth = true } = options;
   const baseUrl = getApiBaseUrl();
 
@@ -163,4 +164,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return payload as T;
+}
+
+export function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+ return withRequestFeedback(path, options.method || 'GET', () => sendRequest<T>(path, options));
+}
+export function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+ return withRequestFeedback(path, 'POST', () => uploadRequest<T>(path, formData));
 }

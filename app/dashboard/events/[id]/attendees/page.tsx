@@ -1,4 +1,5 @@
 "use client";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -27,7 +28,7 @@ export default function EventAttendeesPage() {
   return (
     <AppShell title="Attendees" subtitle="Everyone who has booked this event, with payment and registration details.">
       {event === undefined ? (
-        <div className="empty-state">Loading attendees...</div>
+        <ProgressLoader label="Loading data" />
       ) : event === null ? (
         <div className="panel">
           <div className="panel-body empty-state">

@@ -1,4 +1,5 @@
 "use client";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 import { exportParticipants } from "@/lib/participant-export";
 import { useCallback, useEffect, useState } from "react";
@@ -72,7 +73,7 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
       <div className="toolbar"><input aria-label="Search attendees" placeholder="Search by attendee name or email" value={query} onChange={e => setQuery(e.target.value)} />{!isFreeEvent && <select aria-label="Filter by payment status" value={filter} onChange={e => setFilter(e.target.value)}><option value="">All payment statuses</option><option value="pending">Payment Pending</option><option value="paid">Payment Completed</option><option value="failed">Payment Failed</option></select>}</div>
       {error && <div className="empty-state"><p>{error}</p><button className="btn btn-ghost" onClick={() => void load()}>Retry</button></div>}
       <div className="table-wrap"><table className="attendee-table"><thead><tr><th>Attendee</th>{!isFreeEvent && <><th>Phone</th><th>Amount</th><th>Payment status</th>{access.canApprovePayment && <th>Payment approval</th>}</>}{access.canCheckIn && <th>Check-in management</th>}<th>Registration details</th></tr></thead><tbody>
-        {loading && !bookings.length ? <tr><td colSpan={columns}>Loading attendees...</td></tr> : rows.length ? rows.map(booking => <tr key={booking.id}>
+        {loading && !bookings.length ? <tr><td colSpan={columns}><ProgressLoader label="Loading attendees" /></td></tr> : rows.length ? rows.map(booking => <tr key={booking.id}>
           <td><strong>{booking.name}</strong><div className="event-sub">{booking.email}</div></td>
           {!isFreeEvent && <><td>{booking.phone || "Not provided"}</td><td>{booking.amount ? formatCurrency(booking.amount) : "Free"}</td>
           <td><span className={`pay-badge ${booking.paymentStatus}`}>{PAYMENT_STATUS_LABELS[booking.paymentStatus]}</span></td>

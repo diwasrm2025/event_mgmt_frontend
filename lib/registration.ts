@@ -6,3 +6,10 @@ export function ageThisYear(value: unknown, now = new Date()): number | null {
  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value || value > now.toISOString().slice(0,10)) return null;
  return now.getFullYear() - date.getUTCFullYear();
 }
+
+export function formatRegistrationDeadline(value?: string | null) {
+ if (!value) return "";
+ const date = new Date(value); if (!Number.isFinite(date.getTime())) return "";
+ const day = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace('Sept', 'Sep');
+ return day;
+}

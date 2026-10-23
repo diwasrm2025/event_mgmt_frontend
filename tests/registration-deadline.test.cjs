@@ -1,0 +1,3 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const ts=require('typescript');
+const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../lib/registration.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;const mod={exports:{}};new Function('exports','module',code)(mod.exports,mod);
+test('registration deadline displays only the date',()=>{ assert.equal(mod.exports.formatRegistrationDeadline(new Date(2026,8,17,10,0).toISOString()),'17 Sep 2026'); assert.equal(mod.exports.formatRegistrationDeadline(null),''); assert.equal(mod.exports.formatRegistrationDeadline('bad'),''); });

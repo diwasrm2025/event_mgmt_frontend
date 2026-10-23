@@ -1,4 +1,5 @@
 "use client";
+import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
 import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 
 import Link from "next/link";
@@ -170,7 +171,7 @@ export function BookingsView({ events }: BookingsViewProps) {
                       <td className="mono">{fillRate}%</td>
                       <td className="mono">{formatCurrency(event.attendees * event.price)}</td>
                       <td>
-                        <span className={`badge ${event.status}`}>{event.status}</span>
+                        <EventStatusBadge event={event} />
                       </td>
                       <td style={{ textAlign: "right" }}>
                         <Link href={`${getAdminEventLink(event)}/attendees`} className="btn btn-ghost btn-sm">

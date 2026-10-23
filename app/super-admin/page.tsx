@@ -1,4 +1,6 @@
 "use client";
+import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyRow, CrudEmptyState } from "@/components/ui/CrudEmptyState";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
@@ -154,7 +156,7 @@ export default function SuperAdminDashboardPage() {
       <FeedbackNotice message={error} icon="error" />
 
       {loading ? (
-        <div className="empty-state">Loading Super Admin Data…</div>
+        <ProgressLoader label="Loading administration data" />
       ) : tab === "emails" ? (
         <SystemEmailsTab />
       ) : tab === "events" ? (
@@ -360,25 +362,7 @@ function EventsTab({ events }: { events: SystemEvent[] }) {
                           ) : null}
                         </td>
                         <td>
-                          <span
-                            className="badge"
-                            style={{
-                              background:
-                                e.status === "published"
-                                  ? "rgba(52, 211, 153, 0.15)"
-                                  : e.status === "sold-out"
-                                  ? "rgba(248, 113, 113, 0.15)"
-                                  : "rgba(251, 191, 36, 0.15)",
-                              color:
-                                e.status === "published"
-                                  ? "#34d399"
-                                  : e.status === "sold-out"
-                                  ? "#f87171"
-                                  : "#fbbf24",
-                            }}
-                          >
-                            {e.status}
-                          </span>
+                          <EventStatusBadge event={e} />
                         </td>
                         <td>
                           <div style={{ fontSize: "0.85rem" }}>{e.owner.name}</div>

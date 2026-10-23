@@ -1,4 +1,6 @@
 "use client";
+import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -13,18 +15,20 @@ import {
   faUsers,
   faShareNodes,
   faDownload,
+  faCopy,
+  faSpinner,
   faBullhorn,
   faCalendarDays,
   faMapPin,
   faCircleCheck,
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
-import { registrationClosed } from "@/lib/registration";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   allEvents,
+  duplicateEvent,
   CATEGORY_COLORS,
   finalizeEvent,
   formatCurrency,
@@ -60,6 +64,7 @@ export function EventsView({ onToast }: EventsViewProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
+  const [duplicating, setDuplicating] = useState<string | null>(null);
   const [qrDownloading, setQrDownloading] = useState<string | null>(null);
   const [shareEventTarget, setShareEventTarget] = useState<EventItem | null>(null);
 
@@ -172,12 +177,6 @@ export function EventsView({ onToast }: EventsViewProps) {
     return Boolean(event.sharedPermissions?.length);
   }
 
-  const STATUS_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
-    published: { bg: "rgba(16,185,129,0.12)", color: "#10b981", border: "rgba(16,185,129,0.3)", label: "Published" },
-    draft: { bg: "rgba(148,163,184,0.15)", color: "#64748b", border: "rgba(148,163,184,0.3)", label: "Draft" },
-    "sold-out": { bg: "rgba(239,68,68,0.12)", color: "#ef4444", border: "rgba(239,68,68,0.3)", label: "Sold Out" },
-    completed: { bg: "rgba(99,102,241,0.12)", color: "#6366f1", border: "rgba(99,102,241,0.3)", label: "Completed" },
-  };
 
   return (
     <div className="panel" style={{ overflow: "hidden" }}>
@@ -192,7 +191,7 @@ export function EventsView({ onToast }: EventsViewProps) {
         <div className="toolbar-filters">
           <select className="select-filter" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">All categories</option>
-            {Object.keys(CATEGORY_COLORS).map((name) => (
+            {[...new Set([...Object.keys(CATEGORY_COLORS), ...events.map(event => event.category)])].map((name) => (
               <option value={name} key={name}>{name}</option>
             ))}
           </select>
@@ -241,7 +240,7 @@ export function EventsView({ onToast }: EventsViewProps) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8}><div className="empty-state" style={{ padding: "48px 0" }}>Loading events…</div></td></tr>
+              <tr><td colSpan={8}><div className="empty-state" style={{ padding: "48px 0" }}><ProgressLoader label="Loading events" /></div></td></tr>
             ) : loadError ? (
               <tr><td colSpan={8}><div className="empty-state" style={{ padding: "48px 0" }}>
                 {loadError}{" "}
@@ -253,7 +252,6 @@ export function EventsView({ onToast }: EventsViewProps) {
               filteredEvents.map((event, idx) => {
                 const date = formatDateLabel(event.date);
                 const color = CATEGORY_COLORS[event.category] || "#999";
-                const statusStyle = STATUS_STYLE[event.status] || STATUS_STYLE["draft"];
                 const fillRate = event.capacity > 0 ? Math.round((event.attendees / event.capacity) * 100) : 0;
                 const isOwner = event.isOwner !== false;
 
@@ -372,12 +370,7 @@ export function EventsView({ onToast }: EventsViewProps) {
 
                     {/* Status */}
                     <td style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
-                      <span style={{
-                        display: "inline-block",
-                        background: statusStyle.bg, color: statusStyle.color,
-                        border: `1px solid ${statusStyle.border}`,
-                        borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700,
-                      }}>{registrationClosed(event) ? "Registration closed" : statusStyle.label}</span>
+                      <EventStatusBadge event={event} />
                     </td>
 
                     {/* Actions */}
@@ -409,6 +402,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                             <FontAwesomeIcon icon={faUsers} />
                           </button>
                         )}
+                        {canEdit(event) && <button className="icon-btn has-tooltip" data-tooltip="Duplicate event" aria-label="Duplicate event" disabled={!!duplicating} onClick={async () => { if (duplicating) return; setDuplicating(event.id); try { const copy = await duplicateEvent(event.id); router.push(getAdminEventLink(copy)); } catch { onToast("Could not duplicate event."); } finally { setDuplicating(null); } }}><FontAwesomeIcon icon={duplicating === event.id ? faSpinner : faCopy} spin={duplicating === event.id} /></button>}
                         {canEdit(event) && (
                           <button className="icon-btn has-tooltip" data-tooltip="Edit event"
                             onClick={() => router.push(getAdminEventLink(event))} aria-label="Edit">

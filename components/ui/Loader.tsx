@@ -1,3 +1,4 @@
+import { LoadingWords } from "./LoadingWords";
 import type { CSSProperties } from "react";
 
 /** Small ring spinner used inline (buttons, cards, panels). */
@@ -15,7 +16,7 @@ export function InlineLoader({ label = "Loading..." }: { label?: string }) {
   return (
     <span className="inline-loader">
       <Loader size={16} />
-      {label}
+      <LoadingWords label={label} />
     </span>
   );
 }
@@ -29,7 +30,7 @@ export function PageLoader({ label = "Getting things ready" }: { label?: string 
         SRM Trichy
       </span>
       <Loader size={40} />
-      <p>{label}</p>
+      <p role="status"><LoadingWords label={label} /></p>
     </div>
   );
 }

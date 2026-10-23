@@ -1,4 +1,6 @@
 "use client";
+import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import Link from "next/link";
 import { downloadQr } from "@/lib/qr";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
@@ -279,6 +281,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   const validateStep1 = (): Record<string, string> => {
     const errs: Record<string, string> = {};
     if (info.title.trim().length < 2) errs.title = "Event title must be at least 2 characters.";
+    if (!info.category.trim()) errs.category = "Select or enter a category.";
     if (!isValidDate(info.date)) errs.date = "Please select a valid event date.";
     if (info.eventMode === "online" && !isValidHttpUrl(info.onlineUrl)) errs.onlineUrl = "Enter a valid http or https meeting URL.";
     if (info.eventMode === "offline" && !info.venue.trim()) errs.venue = "Venue location is required.";
@@ -545,9 +548,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   if (loading) {
     return (
-      <div className="wizard-loading">
-        <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 24, color: "var(--accent)" }} />
-        <p style={{ marginTop: 12, color: "var(--text-faint)" }}>Loading event…</p>
+      <div className="wizard-loading"><ProgressLoader label="Loading event" />
       </div>
     );
   }
@@ -619,10 +620,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
           {event && (
             <div className="wizard-sidebar-status">
               <div className="wss-label">Current status</div>
-              <span className={`status-badge status-${details.status}`}>
-                {details.status === "published" ? "✅" : details.status === "sold-out" ? "🔴" : "📝"}{" "}
-                {details.status === "sold-out" ? "Sold Out" : details.status.charAt(0).toUpperCase() + details.status.slice(1)}
-              </span>
+              <EventStatusBadge event={{ ...event, status: details.status }} />
               {event.slug && (
                 <div className="hint" style={{ marginTop: 8, fontSize: 11 }}>
                   Step {step} of 4
@@ -749,21 +747,9 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
               <div className="wizard-field-row">
                 <div className="field">
-                  <label htmlFor="w-category">
-                    <FontAwesomeIcon icon={faBullhorn} className="field-icon" /> Category
-                  </label>
-                  <select
-                    id="w-category"
-                    value={info.category}
-                    onChange={(e) => setInfo({ ...info, category: e.target.value as EventCategory })}
-                  >
-                    <option value="Music">🎵 Music</option>
-                    <option value="Conference">💼 Conference</option>
-                    <option value="Workshop">🛠 Workshop</option>
-                    <option value="Sports">🏆 Sports</option>
-                    <option value="Festival">🎪 Festival</option>
-                    <option value="Community">🤝 Community</option>
-                  </select>
+                  <label htmlFor="w-category">Category</label>
+                  <input id="w-category" list="event-category-options" value={info.category} maxLength={100} required placeholder="Select or type a category" onChange={e => setInfo({ ...info, category: e.target.value })} />
+                  <datalist id="event-category-options">{["Music", "Conference", "Workshop", "Sports", "Festival", "Community"].map(category => <option key={category} value={category} />)}</datalist>
                 </div>
                 <div className="field">
                   <label htmlFor="w-host">
@@ -1362,7 +1348,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 </div>
                 <div className="detail-card">
                   <div className="label">Status</div>
-                  <strong style={{ textTransform: "capitalize" }}>{details.status}</strong>
+                  <EventStatusBadge event={{ ...event, status: details.status }} />
                 </div>
               </div>
             </div>

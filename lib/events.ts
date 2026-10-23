@@ -3,7 +3,7 @@
 import { apiRequest, apiUpload } from "./api";
 
 export type EventStatus = "published" | "draft" | "sold-out" | "completed";
-export type EventCategory = "Music" | "Conference" | "Workshop" | "Sports" | "Festival" | "Community";
+export type EventCategory = string;
 export type EventMode = "online" | "offline";
 export type EventType = "free" | "paid";
 export type FieldType = "text" | "email" | "phone" | "number" | "date" | "textarea" | "select" | "checkbox" | "radio";
@@ -139,6 +139,10 @@ export async function uploadEventBanner(id: string, file: File): Promise<EventIt
 
 export async function removeEventBanner(id: string, url: string): Promise<EventItem> {
   return apiRequest<EventItem>(`/events/${id}/banners`, { method: "DELETE", body: { url } });
+}
+
+export async function duplicateEvent(id: string): Promise<EventItem> {
+  return apiRequest<EventItem>(`/events/${id}/duplicate`, { method: "POST" });
 }
 
 export async function removeEvent(id: string): Promise<void> {

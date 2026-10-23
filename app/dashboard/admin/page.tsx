@@ -1,4 +1,5 @@
 "use client";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyState } from "@/components/ui/CrudEmptyState";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
@@ -97,7 +98,7 @@ export default function AdminPage() {
       <FeedbackNotice message={error} icon="error" />
 
       {loading ? (
-        <div className="empty-state">Loading…</div>
+        <ProgressLoader label="Loading data" />
       ) : tab === "users" ? (
         <UsersTab users={users} roles={roles} myId={myId} onAssign={handleAssignRole} />
       ) : (

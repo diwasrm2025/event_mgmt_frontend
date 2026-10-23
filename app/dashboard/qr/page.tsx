@@ -1,4 +1,5 @@
 "use client";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -61,7 +62,7 @@ export default function QrPage() {
   <section className="panel" style={{ padding: 24 }}>
    <div className="panel-head"><div><h2>Saved QR codes</h2><p className="hint">{isSuperAdmin ? "Links created by all users." : "Create and manage QR codes for your links."}</p></div></div>
    {error && <div role="alert"><p>{error}</p><button className="btn btn-ghost" onClick={() => void load()}>Retry</button></div>}
-   {loading ? <p role="status">Loading QR codes...</p> : !error && <DataTablePagination data={records} searchFields={["title", "url", ...(isSuperAdmin ? ["owner" as const] : [])]} searchPlaceholder="Search QR codes...">
+   {loading ? <ProgressLoader label="Loading QR codes" /> : !error && <DataTablePagination data={records} searchFields={["title", "url", ...(isSuperAdmin ? ["owner" as const] : [])]} searchPlaceholder="Search QR codes...">
     {rows => <div className="table-wrap"><table className="attendee-table"><thead><tr><th>Title of the QR</th><th>URL</th>{isSuperAdmin && <th>Created by</th>}<th>Created at</th><th>Actions</th></tr></thead><tbody>
      {rows.length ? rows.map(record => <tr key={record.id}><td><strong>{record.title}</strong></td><td style={{ maxWidth: 360, overflowWrap: "anywhere" }}><a href={record.url} target="_blank" rel="noopener noreferrer">{record.url}</a></td>{isSuperAdmin && <td>{record.owner.name}<div className="hint">{record.owner.email}</div></td>}<td>{new Date(record.createdAt).toLocaleString()}</td><td><div style={{ display: "flex", gap: 8 }}>
       <button className="icon-btn" title="Download QR code" aria-label={'Download ' + record.title} disabled={!!busy} onClick={() => void download(record)}><FontAwesomeIcon icon={faDownload} /></button>

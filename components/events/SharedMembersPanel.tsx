@@ -1,4 +1,5 @@
 "use client";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyState } from "@/components/ui/CrudEmptyState";
 
 import { useEffect, useMemo, useState } from "react";
@@ -447,7 +448,7 @@ export function SharedMembersPanel({
 
       {/* --- List -------------------------------------------------------- */}
       {loading ? (
-        <p className="hint">Loading shared members…</p>
+        <ProgressLoader label="Loading shared members" />
       ) : visibleMembers.length === 0 ? (
         <CrudEmptyState name="Shared Access" />
       ) : (

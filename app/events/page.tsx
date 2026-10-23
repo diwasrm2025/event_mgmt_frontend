@@ -1,6 +1,6 @@
 "use client";
 
-import { registrationClosed } from "@/lib/registration";
+import { registrationClosed, formatRegistrationDeadline } from "@/lib/registration";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -57,7 +57,8 @@ export default function PublicEventsLandingPage() {
       <PublicTopBar />
 
       {/* ─── Hero Section ─── */}
-      <section className="public-hero">
+      <section className="public-hero public-discovery-hero">
+          <div className="discovery-hero-content">
         <span className="kicker">
           <FontAwesomeIcon icon={faBolt} /> Live Events Platform
         </span>
@@ -82,6 +83,7 @@ export default function PublicEventsLandingPage() {
             <div className="stat-lbl">Free</div>
           </div>
         </div>
+        </div>
       </section>
 
       {/* ─── Category Chips ─── */}
@@ -93,7 +95,7 @@ export default function PublicEventsLandingPage() {
         >
           <FontAwesomeIcon icon={faStar} /> All Events
         </button>
-        {CATEGORIES.map((cat) => (
+        {[...new Set([...CATEGORIES, ...events.map(event => event.category), ...(category ? [category] : [])])].map((cat) => (
           <button
             type="button"
             key={cat}
@@ -150,17 +152,15 @@ export default function PublicEventsLandingPage() {
                 style={{
                   background: event.banners[0]
                     ? undefined
-                    : `linear-gradient(135deg, ${CATEGORY_COLORS[event.category]}44, ${CATEGORY_COLORS[event.category]}11)`,
+                    : `linear-gradient(135deg, ${CATEGORY_COLORS[event.category] || "#8b5cf6"}44, ${CATEGORY_COLORS[event.category] || "#8b5cf6"}11)`,
                 }}
               >
                 {event.banners[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`${ASSET_ORIGIN}${event.banners[0]}`} alt="" />
+                  <img src={/^https?:\/\//i.test(event.banners[0]) ? event.banners[0] : `${ASSET_ORIGIN}${event.banners[0]}`} alt="" />
                 ) : null}
                 <span className="badge">{event.category}</span>
-                {registrationClosed(event) ? ("Registration closed") : event.status === "completed" ? (
-                  <span className="badge completed">Completed</span>
-                ) : (
+                {registrationClosed(event) || event.status === "completed" ? (<span className="registration-closed-text closed-card-badge">Registration closed</span>) : (
                   <span className="price-badge">
                     {event.eventType === "paid" ? `₹${event.price.toLocaleString()}` : "Free"}
                   </span>
@@ -181,13 +181,14 @@ export default function PublicEventsLandingPage() {
                   <FontAwesomeIcon icon={faLocationDot} />
                   {event.venue || "Venue to be announced"}
                 </div>
+                {event.registrationDeadline && <div className="registration-deadline"><span>Last date of registration</span><strong>{formatRegistrationDeadline(event.registrationDeadline)}</strong></div>}
                 <div className="price-row">
                   <span className="price">
                     {event.eventType === "paid" ? `₹${event.price.toLocaleString()}` : "Free Entry"}
                   </span>
-                  <span className="register-arrow">
+                  <span className={`register-arrow ${registrationClosed(event) || event.status === "completed" ? "registration-closed-text" : ""}`}>
                     {registrationClosed(event) ? ("Registration closed") : event.status === "completed" ? (
-                      "Event Completed"
+                      "Registration closed"
                     ) : event.status === "sold-out" ? (
                       "Sold Out"
                     ) : (

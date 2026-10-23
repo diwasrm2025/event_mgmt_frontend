@@ -1,6 +1,8 @@
 "use client";
+import { ProgressLoader } from "@/components/ui/ProgressLoader";
 
-import { registrationClosed, ageThisYear, isDobField } from "@/lib/registration";
+import { registrationClosed, formatRegistrationDeadline, ageThisYear, isDobField } from "@/lib/registration";
+import { ShareEventLink } from "./ShareEventLink";
 import { EventBannerSlider } from "./EventBannerSlider";
 import { apiRequest } from "@/lib/api";
 import { PaymentStatusActions } from "@/components/payments/PaymentStatusActions";
@@ -171,7 +173,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
         <main className="event-detail-shell">
           <div className="empty-state">
-            Loading event...
+            <ProgressLoader label="Loading event" />
           </div>
         </main>
       </>
@@ -197,7 +199,8 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     );
   }
 
-  if (registrationClosed(event)) return <><PublicTopBar /><main className="event-detail-shell"><div className="panel empty-state" role="status">Event registration has been closed.</div></main></>;
+  if (registrationClosed(event) || event.status === "completed") return <><PublicTopBar /><main className="event-closed-page"><section className="event-closed-banner" aria-labelledby="registration-closed-title"><div className="closed-status-icon"><FontAwesomeIcon icon={faClock} /></div><span className="closed-eyebrow">REGISTRATION CLOSED</span><h1 id="registration-closed-title">Registration for this event has closed.</h1><p>The registration period has ended. New registrations are no longer available.</p>{event.registrationDeadline && <p className="closed-deadline">Last date of registration: <strong>{formatRegistrationDeadline(event.registrationDeadline)}</strong></p>}<Link href="/events" className="btn btn-accent">Explore other events</Link></section></main></>;
+
 
   const bookedEvent = event;
 
@@ -336,26 +339,19 @@ export function PublicEventBooking({ slug }: { slug: string }) {
       <PublicTopBar />
 
       <main
-        className="event-detail-shell"
+        className="event-detail-shell event-experience"
         style={
           {
             "--event-category-color":
-              CATEGORY_COLORS[event.category],
+              CATEGORY_COLORS[event.category] || "var(--accent)",
           } as CSSProperties
         }
       >
-        <div className="public-event-grid">
-          {/* =========================
-              EVENT INFORMATION
-          ========================== */}
-
-          <section>
-            <EventBannerSlider
-              banners={event.banners || []}
-              title={event.title}
-            />
-
-            <span className="vip-badge-tag">
+        <Link className="experience-back" href="/events"><FontAwesomeIcon icon={faArrowLeft} /> Explore all events</Link>
+        <ShareEventLink />
+        <div className="experience-banner"><EventBannerSlider banners={event.banners || []} title={event.title} />{!event.banners?.length && <div className="experience-banner-fallback"><span>LIVE / {event.category}</span><strong>Your next great experience</strong></div>}</div>
+        <header className="experience-heading">
+          <div>            <span className="vip-badge-tag">
               {event.category}
             </span>
 
@@ -363,7 +359,17 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
             <p className="event-sub">
               Hosted by <strong>{event.host}</strong>
-            </p>
+            </p></div>
+          <div className="experience-entry"><span>{isFree ? "FREE ENTRY" : "YOUR ACCESS PASS"}</span><strong>{formatCurrency(event.price)}</strong><a href="#event-registration" className="btn btn-vibrant">{soldOut ? "View availability" : "Reserve your spot"}</a></div>
+        </header>
+        {event.registrationDeadline && <div className="experience-deadline"><FontAwesomeIcon icon={faClock} /><div><span>Last date of registration</span><strong>{formatRegistrationDeadline(event.registrationDeadline)}</strong></div></div>}
+        <div className="public-event-grid">
+          {/* =========================
+              EVENT INFORMATION
+          ========================== */}
+
+          <section className="experience-story">
+
 
             <div className="detail-grid">
               <Detail
@@ -417,6 +423,8 @@ export function PublicEventBooking({ slug }: { slug: string }) {
               </div>
             ) : null}
 
+            {!!event.agenda?.length && <section className="experience-agenda"><p className="chart-kicker">THE LINEUP</p><h2>Your event, moment by moment</h2><ol>{event.agenda.map((item, index) => <li key={index}><span>{String(index + 1).padStart(2, "0")}</span><p>{item}</p></li>)}</ol></section>}
+            <div className="experience-host"><p className="chart-kicker">BROUGHT TO YOU BY</p><h3>{event.host}</h3><p>One event. A shared experience. Make it yours.</p></div>
             {event.eventMode === "online" ? (
               <p className="hint">
                 <FontAwesomeIcon icon={faGlobe} />
@@ -431,7 +439,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
               BOOKING CARD
           ========================== */}
 
-          <section className="booking-card booking-form-card">
+          <section id="event-registration" className="booking-card booking-form-card">
             {closed || soldOut ? (
               <div className="sold-out-banner">
                 {closed
