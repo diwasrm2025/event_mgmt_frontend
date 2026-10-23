@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { downloadQr } from "@/lib/qr";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -106,6 +107,7 @@ type InfoForm = {
   category: EventCategory;
   description: string;
   date: string;
+  registrationDeadline: string;
   timeHour: string;
   timeMinute: string;
   timePeriod: "AM" | "PM";
@@ -179,6 +181,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     category: "Music",
     description: "",
     date: "",
+    registrationDeadline: "",
     timeHour: "10",
     timeMinute: "00",
     timePeriod: "AM",
@@ -205,6 +208,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       category: loaded.category,
       description: loaded.description,
       date: loaded.date,
+      registrationDeadline: loaded.registrationDeadline ? new Date(new Date(loaded.registrationDeadline).getTime() - new Date(loaded.registrationDeadline).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
       timeHour: tParts.timeHour,
       timeMinute: tParts.timeMinute,
       timePeriod: tParts.timePeriod,
@@ -241,11 +245,24 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     })();
   }, [eventId, hydrateFromEvent]);
 
-  const goToStep = (target: number) => {
-    if (target > maxStepReached || saving || uploadingBanner || savingField) return;
-    if (target > step && (step === 1 || step === 2)) {
-      setError("Save this step using Continue before moving forward.");
-      return;
+  const goToStep = async (target: number) => {
+    if (saving || uploadingBanner || savingField || target === step) return;
+    if (!eventId) {
+      if (target > maxStepReached) return;
+      if (target > step && (step === 1 || step === 2)) {
+        setError("Save this step using Continue before moving forward.");
+        return;
+      }
+    } else {
+      const errors = validateStep1();
+      if (Object.keys(errors).length) {
+        setStep(1);
+        setStepErrors(errors);
+        setError("Complete the required event information before switching steps.");
+        return;
+      }
+      if (step === 1) { await submitInfo(undefined, target); return; }
+      if (step === 2) { await submitDetails(undefined, target); return; }
     }
     setStep(target);
     setError("");
@@ -273,8 +290,8 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     return errs;
   };
 
-  const submitInfo = async (formEvent: FormEvent) => {
-    formEvent.preventDefault();
+  const submitInfo = async (formEvent?: FormEvent, target = 2) => {
+    formEvent?.preventDefault();
     if (saving) return;
     const errs = validateStep1();
     if (Object.keys(errs).length) {
@@ -296,6 +313,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         category: info.category,
         description: info.description.trim(),
         date: info.date,
+        registrationDeadline: info.registrationDeadline ? new Date(info.registrationDeadline).toISOString() : null,
         time: time24,
         eventMode: info.eventMode,
         onlineUrl: info.eventMode === "online" ? info.onlineUrl.trim() : "",
@@ -307,7 +325,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         wizardStep: 2,
       });
       setEvent((c) => ({ ...updated, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
-      advance(2);
+      advance(target);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save event info.");
     } finally {
@@ -358,8 +376,8 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     }
   };
 
-  const submitDetails = async (formEvent: FormEvent) => {
-    formEvent.preventDefault();
+  const submitDetails = async (formEvent?: FormEvent, target = 3) => {
+    formEvent?.preventDefault();
     if (!event || saving || uploadingBanner) return;
     if (details.agenda.split("\n").filter((line) => line.trim()).length > 30) {
       setError("Add no more than 30 agenda items.");
@@ -378,7 +396,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         wizardStep: 3,
       });
       setEvent((c) => ({ ...updated, isOwner: c?.isOwner, sharedPermissions: c?.sharedPermissions }));
-      advance(3);
+      advance(target);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save these details.");
     } finally {
@@ -577,7 +595,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
             {STEPS.map((item) => {
               const isDone = item.id < step && item.id <= maxStepReached;
               const isActive = item.id === step;
-              const isLocked = item.id > maxStepReached;
+              const isLocked = (!eventId && item.id > maxStepReached) || saving || uploadingBanner || savingField;
               return (
                 <button
                   key={item.id}
@@ -622,6 +640,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         {/* ── Step 1: Event Info, Format & Pricing ─────────────────────────────── */}
         {step === 1 ? (
           <form onSubmit={submitInfo} noValidate className="wizard-form">
+            <div className="field"><label htmlFor="registration-deadline">Registration closure date and time (your local time)</label><input id="registration-deadline" type="datetime-local" value={info.registrationDeadline} onChange={e => setInfo({ ...info, registrationDeadline: e.target.value })} /><p className="hint">Leave empty for no deadline. Applies to free and paid events.</p></div>
             <div className="wizard-form-header">
               <div className="wizard-step-badge-pill">Step 1 of 4</div>
               <h3>Event Details &amp; Pricing</h3>
@@ -1097,7 +1116,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                     {fields.map((field, index) => (
                       <div className="field-builder-row" key={field.id}>
                         <div className="grow">
-                          <div className="field-name">{field.label}</div>
+                          <div className="field-name">{field.label} <button type="button" className="btn btn-ghost btn-sm" onClick={async () => { const decision = await Swal.fire({ title: "Edit question label", input: "textarea", inputValue: field.label, showCancelButton: true }); if (!decision.isConfirmed || !decision.value?.trim()) return; try { const updated = await updateEventField(event!.id, field.id, { label: decision.value.trim() }); setFields(current => current.map(f => f.id === field.id ? updated : f)); } catch (err) { onToast(err instanceof Error ? err.message : "Could not update question."); } }}>Edit label</button></div>
                           <div className="field-meta">
                             <span className="type-chip">{field.type}</span>
                             {field.required ? "Required" : "Optional"}
@@ -1351,10 +1370,11 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
             {event.slug ? (
               <div className="wizard-section">
                 <div className="wizard-section-title">
-                  <FontAwesomeIcon icon={faGlobe} /> Public Booking Link
+                  <FontAwesomeIcon icon={faGlobe} /> Public Booking Link &amp; Download QR
                 </div>
                 <div className="share-url-box">
                   <span style={{ flex: 1, wordBreak: "break-all" }}>{getEventLinkAbsolute(event)}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => void downloadQr(event.title, getEventLinkAbsolute(event)!).catch(() => onToast("Could not download QR code."))}>Download QR Code</button>
                   <button type="button" className="icon-btn" onClick={copyShareLink} aria-label="Copy link">
                     <FontAwesomeIcon icon={faCopy} />
                   </button>
@@ -1378,6 +1398,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
             )}
 
             <EventDashboardSummary eventId={event.id} />
+
             {event.isOwner !== false && <SharedMembersPanel eventId={event.id} isFree={info.eventType === "free" || info.price <= 0} onToast={onToast} />}
 
             <div className="wizard-foot">

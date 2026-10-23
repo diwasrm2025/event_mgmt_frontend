@@ -1,4 +1,5 @@
 "use client";
+import { CrudEmptyState } from "@/components/ui/CrudEmptyState";
 
 import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -448,7 +449,7 @@ export function SharedMembersPanel({
       {loading ? (
         <p className="hint">Loading shared members…</p>
       ) : visibleMembers.length === 0 ? (
-        <p className="hint">No shared members match these filters yet.</p>
+        <CrudEmptyState name="Shared Access" />
       ) : (
         <div className="shared-members-list">
           {visibleMembers.map((member) => (

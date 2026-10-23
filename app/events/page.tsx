@@ -1,5 +1,6 @@
 "use client";
 
+import { registrationClosed } from "@/lib/registration";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -20,6 +21,8 @@ const ASSET_ORIGIN = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/?$/
 const CATEGORIES: EventCategory[] = ["Music", "Conference", "Workshop", "Sports", "Festival", "Community"];
 
 export default function PublicEventsLandingPage() {
+  const [, tick] = useState(0);
+  useEffect(() => { const timer = window.setInterval(() => tick(n => n + 1), 1000); return () => window.clearInterval(timer); }, []);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -155,7 +158,7 @@ export default function PublicEventsLandingPage() {
                   <img src={`${ASSET_ORIGIN}${event.banners[0]}`} alt="" />
                 ) : null}
                 <span className="badge">{event.category}</span>
-                {event.status === "completed" ? (
+                {registrationClosed(event) ? ("Registration closed") : event.status === "completed" ? (
                   <span className="badge completed">Completed</span>
                 ) : (
                   <span className="price-badge">
@@ -183,7 +186,7 @@ export default function PublicEventsLandingPage() {
                     {event.eventType === "paid" ? `₹${event.price.toLocaleString()}` : "Free Entry"}
                   </span>
                   <span className="register-arrow">
-                    {event.status === "completed" ? (
+                    {registrationClosed(event) ? ("Registration closed") : event.status === "completed" ? (
                       "Event Completed"
                     ) : event.status === "sold-out" ? (
                       "Sold Out"

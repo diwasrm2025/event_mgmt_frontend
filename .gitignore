@@ -3,6 +3,7 @@
 /.pnp
 .pnp.*
 .yarn/*
+/.npm-cache
 
 # testing
 /coverage

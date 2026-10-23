@@ -1,7 +1,9 @@
 "use client";
+import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Swal } from "@/lib/swal";
+import { downloadQr } from "@/lib/qr";
 import {
   faMagnifyingGlass,
   faXmark,
@@ -10,12 +12,14 @@ import {
   faLink,
   faUsers,
   faShareNodes,
+  faDownload,
   faBullhorn,
   faCalendarDays,
   faMapPin,
   faCircleCheck,
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
+import { registrationClosed } from "@/lib/registration";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -56,6 +60,7 @@ export function EventsView({ onToast }: EventsViewProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
+  const [qrDownloading, setQrDownloading] = useState<string | null>(null);
   const [shareEventTarget, setShareEventTarget] = useState<EventItem | null>(null);
 
   const session = useMemo(() => getSession(), []);
@@ -83,6 +88,16 @@ export function EventsView({ onToast }: EventsViewProps) {
     window.addEventListener("open-event-modal", openHandler);
     return () => window.removeEventListener("open-event-modal", openHandler);
   }, [router]);
+
+  async function downloadEventQr(event: EventItem) {
+    const url = getEventLinkAbsolute(event);
+    if (!url) return;
+    setQrDownloading(event.id);
+    try {
+      await downloadQr(event.title, url);
+    } catch { onToast("Could not download the event QR code."); }
+    finally { setQrDownloading(null); }
+  }
 
   const filteredEvents = useMemo(() => {
     return [...events]
@@ -174,7 +189,7 @@ export function EventsView({ onToast }: EventsViewProps) {
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events, venues, hosts…" />
           </div>
         </div>
-        <div className="toolbar-filters" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="toolbar-filters">
           <select className="select-filter" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">All categories</option>
             {Object.keys(CATEGORY_COLORS).map((name) => (
@@ -233,11 +248,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                 <button type="button" className="btn btn-ghost btn-sm" onClick={loadEvents}>Retry</button>
               </div></td></tr>
             ) : !filteredEvents.length ? (
-              <tr><td colSpan={8}><div className="empty-state" style={{ padding: "60px 0" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🎟️</div>
-                <div style={{ fontWeight: 600, color: "var(--text-soft)", marginBottom: 6 }}>No events found</div>
-                <div style={{ fontSize: 13, color: "var(--text-faint)" }}>Try clearing filters or create a new event.</div>
-              </div></td></tr>
+              <CrudEmptyRow name="Events" columns={8} />
             ) : (
               filteredEvents.map((event, idx) => {
                 const date = formatDateLabel(event.date);
@@ -366,7 +377,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                         background: statusStyle.bg, color: statusStyle.color,
                         border: `1px solid ${statusStyle.border}`,
                         borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700,
-                      }}>{statusStyle.label}</span>
+                      }}>{registrationClosed(event) ? "Registration closed" : statusStyle.label}</span>
                     </td>
 
                     {/* Actions */}
@@ -385,6 +396,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                             <FontAwesomeIcon icon={faShareNodes} />
                           </button>
                         )}
+                        {event.slug && <button className="icon-btn has-tooltip" data-tooltip="Download event QR code" aria-label="Download event QR code" disabled={qrDownloading === event.id} onClick={() => void downloadEventQr(event)}><FontAwesomeIcon icon={faDownload} /></button>}
                         {event.slug && (
                           <button className="icon-btn has-tooltip" data-tooltip="Copy booking link"
                             onClick={() => copyLink(event)} aria-label="Copy booking link">

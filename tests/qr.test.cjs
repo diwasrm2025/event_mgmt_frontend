@@ -1,0 +1,7 @@
+const {test}=require('node:test'); const assert=require('node:assert/strict'); const ts=require('typescript'); const fs=require('node:fs');
+function load(confirmed) { const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../lib/qr.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;const mod={exports:{}}; const calls=[];new Function('exports','module','require',code)(mod.exports,mod,name=>name==='./swal'?{Swal:{fire:async()=>({isConfirmed:confirmed})}}:{toDataURL:async url=>{calls.push(url);return 'data:image/png;base64,qr';}});return {...mod.exports,calls};}
+test('QR filenames are derived from the title',()=>{const {qrFilename}=load(true);assert.equal(qrFilename(' Annual Sports Meet! '),'annual-sports-meet.png');assert.equal(qrFilename('Caf\u00e9 Event'),'cafe-event.png');assert.equal(qrFilename(''),'qr-code.png');});
+test('QR cancel prevents generation; confirmation downloads correct URL and filename',async()=>{
+ const old=global.document;let clicked=0;let link;global.document={createElement:()=>link={click(){clicked++;}}};
+ try {let qr=load(false);await qr.downloadQr('Event','https://example.com');assert.equal(qr.calls.length,0);assert.equal(clicked,0);qr=load(true);await qr.downloadQr('My Event','https://example.com/path');assert.deepEqual(qr.calls,['https://example.com/path']);assert.equal(clicked,1);assert.equal(link.download,'my-event.png');}finally{global.document=old;}
+});

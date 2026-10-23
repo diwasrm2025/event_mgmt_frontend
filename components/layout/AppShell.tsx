@@ -9,6 +9,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ACCENT_OPTIONS, type ThemeMode } from "@/lib/themePrefs";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import {
+  faQrcode,
   faSun,
   faMoon,
   faCheck,
@@ -102,6 +103,7 @@ const navigation = [
   { href: "/dashboard/events", label: "Events", icon: "ticket" },
   { href: "/bookings", label: "Bookings", icon: "users" },
   { href: "/analytics", label: "Analytics", icon: "chart" },
+  { href: "/dashboard/qr", label: "Generate QR", icon: "qr" },
   { href: "/calendar", label: "Calendar", icon: "calendar" },
 ];
 
@@ -115,6 +117,7 @@ function formatRoleName(role?: string) {
 
 function NavIcon({ name }: { name: string }) {
   switch (name) {
+    case "qr": return <FontAwesomeIcon icon={faQrcode} />;
     case "ticket":
       return <FontAwesomeIcon icon={faTicket} />;
     case "users":

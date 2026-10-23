@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { ageThisYear, isDobField } from "@/lib/registration";
 import type { EventItem, RosterBooking } from "@/lib/events";
 
 function displayValue(value: unknown): string {
@@ -35,6 +36,7 @@ export function RegistrationDetailsDialog({ event, booking, onClose }: {
     { key: "default-email", label: "Email Address", value: booking.email },
     { key: "default-phone", label: "Mobile Number", value: booking.phone },
     ...fields.map((field) => ({ key: `field-${field.id}`, label: field.label, value: responses[field.name] })),
+    ...fields.filter(isDobField).map(field => ({ key: `age-${field.id}`, label: `Age in ${new Date().getFullYear()} (${field.label})`, value: ageThisYear(responses[field.name]) })),
     // Preserve answers to fields that have since been removed from the event.
     ...Object.entries(responses).filter(([name]) => !knownNames.has(name))
       .map(([name, value]) => ({ key: `response-${name}`, label: name, value })),

@@ -1,7 +1,9 @@
 "use client";
+import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
+import { exportParticipants } from "@/lib/participant-export";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { getEventBookings, PAYMENT_STATUS_LABELS, getAdminEventLink, formatCurrency, type EventItem, type RosterBooking, type RosterAccess } from "@/lib/events";
+import { listEventFields, getEventBookings, PAYMENT_STATUS_LABELS, getAdminEventLink, formatCurrency, type EventItem, type RosterBooking, type RosterAccess } from "@/lib/events";
 import { toggleAttendeeCheckIn, updateRegistrationStatus } from "@/lib/rbac";
 import { Swal, notify } from "@/lib/swal";
 import { RegistrationDetailsDialog } from "./RegistrationDetailsDialog";
@@ -56,16 +58,15 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
     catch (err) { void notify(err instanceof Error ? err.message : "Could not update check-in.", "error"); }
     finally { setBusy(null); }
   }
-  function exportCsv() {
-    const fields: (keyof RosterBooking)[] = ["name", "email", ...(!isFreeEvent ? ["phone", "paymentStatus"] as const : []), ...(!isFreeEvent && access.canApprovePayment ? ["transactionId", "rejectionReason"] as const : []), ...(access.canCheckIn ? ["checkedIn"] as const : [])];
-    const escape = (value: unknown) => '"' + String(value ?? "").replace(/^[=+@-]/, match => "'" + match).replace(/"/g, '""') + '"';
-    const content = [fields.join(","), ...rows.map(row => fields.map(key => escape(row[key])).join(","))].join("\n");
-    const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8;" }));
-    const link = document.createElement("a"); link.href = url; link.download = "attendees.csv"; link.click(); URL.revokeObjectURL(url);
+  async function exportExcel() {
+    setBusy("export");
+    try { const [result, fields] = await Promise.all([getEventBookings(event.id), listEventFields(event.id)]); await exportParticipants({ ...event, fields }, result.items, result.capabilities); }
+    catch (err) { void notify(err instanceof Error ? err.message : "Could not export participants.", "error"); }
+    finally { setBusy(null); }
   }
   const columns = 2 + Number(!isFreeEvent) * 3 + Number(!isFreeEvent && access.canApprovePayment) + Number(access.canCheckIn);
   return <div className="roster-page">
-    <div className="roster-toolbar"><Link className="btn btn-ghost" href={getAdminEventLink(event)}>Back to event</Link><button className="btn btn-ghost" onClick={() => void load()} disabled={loading}>Refresh</button><button className="btn btn-accent" onClick={exportCsv} disabled={!rows.length}>Export CSV</button></div>
+    <div className="roster-toolbar"><Link className="btn btn-ghost" href={getAdminEventLink(event)}>Back to event</Link><button className="btn btn-ghost" onClick={() => void load()} disabled={loading}>Refresh</button><button className="btn btn-accent" onClick={() => void exportExcel()} disabled={loading || !!busy}>Export all participants (Excel)</button></div>
     <div className="roster-summary"><div className="summary-card"><p>Attendees</p><strong>{bookings.length}</strong></div>{!isFreeEvent && <div className="summary-card"><p>Payment pending</p><strong>{bookings.filter(b => b.paymentStatus === "pending").length}</strong></div>}{access.canCheckIn && <div className="summary-card"><p>Checked in</p><strong>{bookings.filter(b => b.checkedIn).length}</strong></div>}</div>
     <section className="panel"><div className="panel-head"><h2>{event.title}: attendees</h2></div>
       <div className="toolbar"><input aria-label="Search attendees" placeholder="Search by attendee name or email" value={query} onChange={e => setQuery(e.target.value)} />{!isFreeEvent && <select aria-label="Filter by payment status" value={filter} onChange={e => setFilter(e.target.value)}><option value="">All payment statuses</option><option value="pending">Payment Pending</option><option value="paid">Payment Completed</option><option value="failed">Payment Failed</option></select>}</div>
@@ -78,7 +79,7 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
           {access.canApprovePayment && <td>{booking.paymentMethod === "sbiepay" && <p className="hint">Verified automatically by SBI Order Search.</p>}<p className="mono">Transaction: {booking.transactionId || "Not submitted"}</p>{booking.paymentProof && <details><summary>View payment screenshot</summary><img className="roster-proof" src={booking.paymentProof} alt={`Payment screenshot for ${booking.name}`} /></details>}{booking.rejectionReason && <p className="payment-review-banner is-rejected">Reason: {booking.rejectionReason}</p>}{booking.paymentMethod !== "sbiepay" && booking.paymentStatus !== "paid" && <div className="roster-actions"><button className="btn btn-accent btn-sm" disabled={!!busy || !booking.paymentProof || !booking.transactionId} onClick={() => void review(booking, true)}>Accept payment</button><button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => void review(booking, false)}>Reject</button></div>}</td>}</>}
           {access.canCheckIn && <td><button className="btn btn-ghost btn-sm" disabled={!!busy || booking.paymentStatus !== "paid" || booking.registrationStatus !== "approved"} onClick={() => void checkIn(booking)}>{booking.checkedIn ? "Check out" : "Check in"}</button><p className="hint">{booking.checkedIn ? "Checked in" : "Not checked in"}</p></td>}
           <td><button type="button" className="btn btn-ghost btn-sm" aria-haspopup="dialog" onClick={() => setSelectedBooking(booking)}>View form</button></td>
-        </tr>) : <tr><td colSpan={columns}>No attendees match your search.</td></tr>}
+        </tr>) : <CrudEmptyRow name="Attendees" columns={columns} />}
       </tbody></table></div>
     </section>
     {selectedBooking && <RegistrationDetailsDialog event={event} booking={selectedBooking} onClose={() => setSelectedBooking(null)} />}

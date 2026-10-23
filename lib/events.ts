@@ -22,6 +22,8 @@ export interface EventItem {
   id: string;
   /** Null until the admin completes the final wizard step. */
   slug: string | null;
+  registrationDeadline?: string | null;
+  registrationClosed?: boolean;
   title: string;
   category: EventCategory;
   date: string;
@@ -72,6 +74,7 @@ export type EventFilters = {
 /** Every field but `title` is optional — the wizard fills these in one step
  * (and one PATCH) at a time. */
 export type EventPayload = Partial<{
+  registrationDeadline: string | null;
   title: string;
   category: EventCategory;
   date: string;

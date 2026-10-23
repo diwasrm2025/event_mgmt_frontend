@@ -1,4 +1,5 @@
 "use client";
+import { CrudEmptyRow, CrudEmptyState } from "@/components/ui/CrudEmptyState";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useMemo, useState } from "react";
@@ -388,7 +389,7 @@ function EventsTab({ events }: { events: SystemEvent[] }) {
                   })}
                   {paginatedEvents.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="empty-state">No events found.</td>
+                      <td colSpan={9}><CrudEmptyState name="Events" /></td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -466,6 +467,7 @@ function UsersAndRolesTab({
                       </tr>
                     </thead>
                     <tbody>
+                      {!paginatedUsers.length && <CrudEmptyRow name="System Users" columns={5} />}
                       {paginatedUsers.map((user) => (
                         <tr key={user.id}>
                           <td>
@@ -550,6 +552,7 @@ function UsersAndRolesTab({
             </button>
           </div>
           <div className="panel-body" style={{ display: "grid", gap: "14px" }}>
+            {!roles.length && <CrudEmptyState name="Roles & Permissions" />}
             {roles.map((role) => (
               <RoleCard key={role.id} role={role} onChanged={onChanged} onToast={onToast} />
             ))}

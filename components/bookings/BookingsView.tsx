@@ -1,4 +1,5 @@
 "use client";
+import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -180,14 +181,7 @@ export function BookingsView({ events }: BookingsViewProps) {
                   );
                 })
               ) : (
-                <tr>
-                  <td colSpan={8}>
-                    <div className="empty-state">
-                      <div className="glyph">Tickets</div>
-                      No bookings match your filters. Try clearing them.
-                    </div>
-                  </td>
-                </tr>
+                <CrudEmptyRow name="Bookings" columns={8} />
               )}
             </tbody>
           </table>

@@ -1,4 +1,5 @@
 "use client";
+import { CrudEmptyState } from "@/components/ui/CrudEmptyState";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useMemo, useState } from "react";
@@ -149,7 +150,8 @@ function UsersTab({
                       className="input-select"
                       style={{ minWidth: "170px" }}
                     >
-                      {roles.map((role) => (
+                      {!roles.length && <CrudEmptyState name="Roles" />}
+        {roles.map((role) => (
                         <option key={role.id} value={role.id}>
                           {formatRoleName(role.name)}
                         </option>
@@ -161,7 +163,7 @@ function UsersTab({
               ))}
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="empty-state">No users yet.</td>
+                  <td colSpan={4}><CrudEmptyState name="Users" /></td>
                 </tr>
               ) : null}
             </tbody>

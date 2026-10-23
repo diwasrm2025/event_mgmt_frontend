@@ -1,5 +1,6 @@
 "use client";
 
+import { registrationClosed, ageThisYear, isDobField } from "@/lib/registration";
 import { EventBannerSlider } from "./EventBannerSlider";
 import { apiRequest } from "@/lib/api";
 import { PaymentStatusActions } from "@/components/payments/PaymentStatusActions";
@@ -65,6 +66,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   const session = useMemo(() => getSession(), []);
 
   const [event, setEvent] = useState<EventItem | null | undefined>();
+
+  const [, tick] = useState(0);
+  useEffect(() => { const timer = window.setInterval(() => tick(n => n + 1), 1000); return () => window.clearInterval(timer); }, []);
 
   const [name, setName] = useState(session?.name ?? "");
   const [email, setEmail] = useState(session?.email ?? "");
@@ -193,6 +197,8 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     );
   }
 
+  if (registrationClosed(event)) return <><PublicTopBar /><main className="event-detail-shell"><div className="panel empty-state" role="status">Event registration has been closed.</div></main></>;
+
   const bookedEvent = event;
 
   const date = formatDateLabel(event.date);
@@ -251,6 +257,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
       return reportDetailsError("Ticket pricing is unavailable. Please contact the organizer.");
     }
     for (const field of bookedEvent.fields ?? []) {
+      if (isDobField(field) && responses[field.name] && ageThisYear(responses[field.name]) === null) return reportDetailsError("Enter a valid date of birth that is not in the future.");
       const message = validateRegistrationField(field, responses[field.name]);
       if (message) return reportDetailsError(message);
     }
@@ -499,14 +506,13 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
                     {(event.fields ?? []).map(
                       (field) => (
-                        <RegistrationField
-                          key={field.id}
+                        <div key={field.id}><RegistrationField
                           field={field}
                           value={
                             responses[field.name]
                           }
                           onChange={setResponse}
-                        />
+                        />{isDobField(field) && <p className="hint">Age in {new Date().getFullYear()}: {ageThisYear(responses[field.name]) ?? "Enter a valid date of birth"}</p>}</div>
                       ),
                     )}
 
