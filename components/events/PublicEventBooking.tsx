@@ -362,7 +362,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
             <p className="event-sub">
               Hosted by <strong>{event.host}</strong>
             </p></div>
-          <div className="experience-entry"><span>{isFree ? "FREE ENTRY" : "YOUR ACCESS PASS"}</span><strong>{formatCurrency(event.price)}</strong><a href="#event-registration" className="btn btn-vibrant">{soldOut ? "View availability" : "Reserve your spot"}</a></div>
+          <div className="experience-entry"><span>{isFree ? "FREE ENTRY" : "YOUR ACCESS PASS"}</span><strong>{formatCurrency(event.price)}</strong><a href="#event-registration" className="btn btn-vibrant">{soldOut ? "View availability" : "Click Here to Register"}</a></div>
         </header>
         {event.registrationDeadline && <div className="experience-deadline"><FontAwesomeIcon icon={faClock} /><div><span>Last date of registration</span><strong>{formatRegistrationDeadline(event.registrationDeadline)}</strong></div></div>}
         <div className="public-event-grid">
