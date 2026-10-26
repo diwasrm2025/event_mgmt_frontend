@@ -15,8 +15,7 @@ export function isAgeField(field: { type: string; name?: string; label?: string 
 }
 
 /**
- * Calculates completed years and remaining months from DOB.
- * Example output: "11.3" (11 years, 3 months), "11.1" (11 years, 1 month), "25.0" (25 years, 0 months)
+ * Calculates completed whole years from DOB.
  */
 export function calculateAgeWithMonths(value: unknown, now = new Date()): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -38,7 +37,7 @@ export function calculateAgeWithMonths(value: unknown, now = new Date()): string
   // Reject future birthdates
   if (years < 0 || (years === 0 && months < 0)) return null;
 
-  return `${years}.${months}`;
+  return `${years}`;
 }
 
 export function ageThisYear(value: unknown, now = new Date()): number | null {
