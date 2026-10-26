@@ -10,8 +10,6 @@ import { Swal } from "@/lib/swal";
 import {
   faArrowLeft,
   faArrowRight,
-  faArrowUp,
-  faArrowDown,
   faCheck,
   faCloudArrowUp,
   faCopy,
@@ -34,9 +32,26 @@ import {
   faImage,
   faClipboardList,
   faShareNodes,
+  faGripVertical,
+  faPen,
+  faArrowUp,
+  faArrowDown,
+  faRotateRight,
+  faXmark,
+  faFont,
+  faEnvelope,
+  faPhone,
+  faHashtag,
+  faCircleDot,
+  faSquareCheck,
+  faChevronDown,
+  faT,
+  faToggleOn,
+  faToggleOff,
 } from "@fortawesome/free-solid-svg-icons";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { isDobField, isAgeField, calculateAgeWithMonths, pairDobAndAgeFields } from "@/lib/registration";
 import {
   createDraftEvent,
   createEventField,
@@ -103,6 +118,22 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "checkbox", label: "Checkbox" },
   { value: "radio", label: "Radio buttons" },
 ];
+
+// Icon for each field type shown on the field card
+const fieldTypeIconMap = {
+  text:     faFont,
+  textarea: faAlignLeft,
+  email:    faEnvelope,
+  phone:    faPhone,
+  number:   faHashtag,
+  date:     faCalendarDays,
+  select:   faChevronDown,
+  checkbox: faSquareCheck,
+  radio:    faCircleDot,
+} as const;
+function getFieldTypeIcon(type: string) {
+  return (fieldTypeIconMap as Record<string, typeof faFont>)[type] ?? faT;
+}
 
 type InfoForm = {
   title: string;
@@ -177,6 +208,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
   const [error, setError] = useState("");
   const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [savingField, setSavingField] = useState(false);
 
   const [info, setInfo] = useState<InfoForm>({
     title: "",
@@ -199,7 +231,18 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const [fields, setFields] = useState<EventFormFieldItem[]>([]);
   const [newField, setNewField] = useState<NewFieldForm>(emptyNewField());
-  const [savingField, setSavingField] = useState(false);
+  const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
+  const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<{
+    id: string;
+    label: string;
+    type: FieldType;
+    required: boolean;
+    options: string;
+  } | null>(null);
+  const [updatingField, setUpdatingField] = useState(false);
+  const [previewResponses, setPreviewResponses] = useState<Record<string, any>>({});
+  const pairedPreviewFields = useMemo(() => pairDobAndAgeFields(fields), [fields]);
 
   const hydrateFromEvent = useCallback((loaded: EventItem) => {
     setEvent(loaded);
@@ -346,8 +389,8 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     try {
       let latestEvent = event;
       for (const file of fileList) {
-        if (!/\.(jpe?g|png|webp|gif)$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
-          onToast(`Skipped ${file.name}: use JPG, PNG, WebP or GIF images up to 5 MB.`);
+        if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+          onToast(`Skipped ${file.name}: choose an image up to 5 MB.`);
           continue;
         }
         if ((latestEvent.banners ?? []).length >= 8) {
@@ -437,7 +480,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       onToast("Give the field a label.");
       return;
     }
-    const options = [...new Set(newField.options.split(",").map((option) => option.trim()).filter(Boolean))];
+    const options = [...new Set(newField.options.split(/\r?\n|,/).map((option) => option.trim()).filter(Boolean))];
     if (["select", "radio"].includes(newField.type) && options.length < 2) {
       onToast("Add at least two distinct options for this field.");
       return;
@@ -449,7 +492,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         label: newField.label.trim(),
         type: newField.type,
         required: newField.required,
-        options: ["select", "radio"].includes(newField.type) ? options : [],
+        options: ["select", "radio", "checkbox"].includes(newField.type) ? options : [],
       });
       setFields((current) => [...current, created]);
       setNewField(emptyNewField());
@@ -483,12 +526,15 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     }
   };
 
-  const moveField = async (index: number, direction: -1 | 1) => {
-    if (!event) return;
-    const target = index + direction;
-    if (target < 0 || target >= fields.length) return;
-    const next = [...fields];
-    [next[index], next[target]] = [next[target], next[index]];
+  const reorderFields = async (draggedId: string, targetId: string) => {
+    if (!event || draggedId === targetId) return;
+    const previous = fields;
+    const from = previous.findIndex((field) => field.id === draggedId);
+    const to = previous.findIndex((field) => field.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...previous];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
     setFields(next);
     try {
       const reordered = await reorderEventFields(
@@ -497,8 +543,102 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       );
       setFields(reordered);
     } catch {
+      setFields(previous);
+      onToast("Could not reorder fields.");
+    }
+  };
+
+  const openEditFieldModal = (field: EventFormFieldItem) => {
+    setEditingField({
+      id: field.id,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      options: field.options.join("\n"),
+    });
+  };
+
+  const handleSaveEditField = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!event || !editingField) return;
+    if (!editingField.label.trim()) {
+      onToast("Give the field a label.");
+      return;
+    }
+    const options = [...new Set(editingField.options.split(/\r?\n|,/).map((o) => o.trim()).filter(Boolean))];
+    if (["select", "radio"].includes(editingField.type) && options.length < 2) {
+      onToast("Add at least two distinct choices for this field.");
+      return;
+    }
+    setUpdatingField(true);
+    try {
+      const updated = await updateEventField(event.id, editingField.id, {
+        label: editingField.label.trim(),
+        type: editingField.type,
+        required: editingField.required,
+        options: ["select", "radio", "checkbox"].includes(editingField.type) ? options : [],
+      });
+      setFields((current) => current.map((f) => (f.id === editingField.id ? updated : f)));
+      setEditingField(null);
+      onToast("Custom field updated successfully.");
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Could not update that field.");
+    } finally {
+      setUpdatingField(false);
+    }
+  };
+
+  const moveField = async (index: number, direction: "up" | "down") => {
+    if (!event) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= fields.length) return;
+    const reordered = [...fields];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+    setFields(reordered);
+    try {
+      const serverReordered = await reorderEventFields(
+        event.id,
+        reordered.map((f) => f.id)
+      );
+      setFields(serverReordered);
+    } catch {
       setFields(fields);
       onToast("Could not reorder fields.");
+    }
+  };
+
+  const handlePreviewChange = (fieldName: string, value: any, fieldType: string) => {
+    setPreviewResponses((prev) => {
+      const next = { ...prev, [fieldName]: value };
+      const pairedAgeName = pairedPreviewFields.dobToAge[fieldName];
+      if (pairedAgeName && fieldType === "date") {
+        const calcAge = calculateAgeWithMonths(value);
+        next[pairedAgeName] = calcAge ?? "";
+      }
+      return next;
+    });
+  };
+
+  const editFieldOptions = async (field: EventFormFieldItem) => {
+    const decision = await Swal.fire({
+      title: `Edit ${field.type === "checkbox" ? "checkbox" : field.type === "radio" ? "radio" : "dropdown"} choices`,
+      input: "textarea",
+      inputValue: field.options.join("\n"),
+      inputPlaceholder: "One choice per line",
+      showCancelButton: true,
+    });
+    if (!decision.isConfirmed) return;
+    const options = [...new Set(String(decision.value ?? "").split(/\r?\n|,/).map((option) => option.trim()).filter(Boolean))];
+    if ((field.type === "select" || field.type === "radio") && options.length < 2) {
+      onToast("Add at least two distinct choices for this field.");
+      return;
+    }
+    try {
+      const updated = await updateEventField(event!.id, field.id, { options });
+      setFields((current) => current.map((item) => item.id === field.id ? updated : item));
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Could not update choices.");
     }
   };
 
@@ -1099,65 +1239,132 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                     <FontAwesomeIcon icon={faListCheck} /> Custom Fields ({fields.length})
                   </div>
                   <div className="field-builder-list">
-                    {fields.map((field, index) => (
-                      <div className="field-builder-row" key={field.id}>
-                        <div className="grow">
-                          <div className="field-name">{field.label} <button type="button" className="btn btn-ghost btn-sm" onClick={async () => { const decision = await Swal.fire({ title: "Edit question label", input: "textarea", inputValue: field.label, showCancelButton: true }); if (!decision.isConfirmed || !decision.value?.trim()) return; try { const updated = await updateEventField(event!.id, field.id, { label: decision.value.trim() }); setFields(current => current.map(f => f.id === field.id ? updated : f)); } catch (err) { onToast(err instanceof Error ? err.message : "Could not update question."); } }}>Edit label</button></div>
-                          <div className="field-meta">
-                            <span className="type-chip">{field.type}</span>
-                            {field.required ? "Required" : "Optional"}
-                            {field.type === "select" && field.options.length ? ` · ${field.options.join(", ")}` : ""}
+                    {fields.map((field, idx) => {
+                      const isReq = field.required;
+                      return (
+                        <div
+                          className={`field-card ${draggedFieldId === field.id ? "dragging" : ""} ${dragOverFieldId === field.id ? "drag-over" : ""}`}
+                          key={field.id}
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggedFieldId(field.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", field.id);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            if (dragOverFieldId !== field.id) setDragOverFieldId(field.id);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverFieldId === field.id) setDragOverFieldId(null);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const draggedId = e.dataTransfer.getData("text/plain") || draggedFieldId;
+                            if (draggedId) void reorderFields(draggedId, field.id);
+                            setDraggedFieldId(null);
+                            setDragOverFieldId(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedFieldId(null);
+                            setDragOverFieldId(null);
+                          }}
+                        >
+                          {/* Drag + reorder column */}
+                          <div className="field-card-drag-col">
+                            <span className="field-drag-handle" aria-label="Drag to reorder" title="Drag to reorder">
+                              <FontAwesomeIcon icon={faGripVertical} />
+                            </span>
+                            <button
+                              type="button"
+                              className="field-reorder-btn"
+                              disabled={idx === 0}
+                              onClick={() => moveField(idx, "up")}
+                              title="Move up"
+                              aria-label="Move up"
+                            >
+                              <FontAwesomeIcon icon={faArrowUp} />
+                            </button>
+                            <button
+                              type="button"
+                              className="field-reorder-btn"
+                              disabled={idx === fields.length - 1}
+                              onClick={() => moveField(idx, "down")}
+                              title="Move down"
+                              aria-label="Move down"
+                            >
+                              <FontAwesomeIcon icon={faArrowDown} />
+                            </button>
+                          </div>
+
+                          {/* Type icon badge */}
+                          <div className="field-card-icon-badge">
+                            <FontAwesomeIcon icon={getFieldTypeIcon(field.type)} />
+                          </div>
+
+                          {/* Main content */}
+                          <div className="field-card-body">
+                            <div className="field-card-label">{field.label}</div>
+                            <div className="field-card-chips">
+                              <span className="field-type-chip">
+                                {FIELD_TYPES.find((t) => t.value === field.type)?.label ?? field.type}
+                              </span>
+                              {field.options.length > 0 && (
+                                <span className="field-options-chip">
+                                  {field.options.slice(0, 3).join(" · ")}{field.options.length > 3 ? ` +${field.options.length - 3}` : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Required toggle + actions */}
+                          <div className="field-card-controls">
+                            {/* Toggle switch for required */}
+                            <button
+                              type="button"
+                              className={`field-required-toggle ${isReq ? "is-required" : "is-optional"}`}
+                              onClick={() => toggleFieldRequired(field)}
+                              title={isReq ? "Click to make optional" : "Click to make required"}
+                              aria-pressed={isReq}
+                            >
+                              <span className="frt-track">
+                                <span className="frt-thumb" />
+                              </span>
+                              <span className="frt-label">
+                                {isReq ? (
+                                  <><FontAwesomeIcon icon={faCheck} /> Required</>
+                                ) : (
+                                  <><span className="frt-q">?</span> Optional</>
+                                )}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm field-card-edit-btn"
+                              onClick={() => openEditFieldModal(field)}
+                              title="Edit field"
+                            >
+                              <FontAwesomeIcon icon={faPen} /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn danger"
+                              onClick={() => deleteField(field)}
+                              aria-label="Delete field"
+                              title="Delete field"
+                            >
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
                           </div>
                         </div>
-                        <div className="field-builder-actions">
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            onClick={() => moveField(index, -1)}
-                            disabled={index === 0}
-                            aria-label="Move up"
-                          >
-                            <FontAwesomeIcon icon={faArrowUp} />
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            onClick={() => moveField(index, 1)}
-                            disabled={index === fields.length - 1}
-                            aria-label="Move down"
-                          >
-                            <FontAwesomeIcon icon={faArrowDown} />
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            onClick={() => toggleFieldRequired(field)}
-                            aria-label="Toggle required"
-                          >
-                            {field.required ? "Req" : "Opt"}
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-btn danger"
-                            onClick={() => deleteField(field)}
-                            aria-label="Delete field"
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {!fields.length ? (
-                      <div
-                        className="hint"
-                        style={{
-                          padding: "16px",
-                          border: "1px dashed var(--border-strong)",
-                          borderRadius: 12,
-                          textAlign: "center",
-                        }}
-                      >
-                        No custom fields yet. The default Name &amp; Email are sufficient for most events.
+                      <div className="field-empty-state">
+                        <FontAwesomeIcon icon={faClipboardList} style={{ fontSize: 28, opacity: 0.35 }} />
+                        <span>No custom fields yet.<br />Name, Email &amp; Phone are always collected.</span>
                       </div>
                     ) : null}
                   </div>
@@ -1175,7 +1382,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                           id="nf-label"
                           value={newField.label}
                           onChange={(e) => setNewField({ ...newField, label: e.target.value })}
-                          placeholder="e.g. Student Register Number"
+                          placeholder="e.g. Date of Birth"
                         />
                       </div>
                       <div className="field" style={{ margin: 0 }}>
@@ -1193,28 +1400,39 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                         </select>
                       </div>
                     </div>
-                    {newField.type === "select" || newField.type === "radio" ? (
+                    {["select", "radio", "checkbox"].includes(newField.type) ? (
                       <div className="field" style={{ marginTop: 10 }}>
                         <label htmlFor="nf-options">
-                          {newField.type === "radio" ? "Radio" : "Dropdown"} Options (comma-separated)
+                          {newField.type === "checkbox" ? "Checkbox" : newField.type === "radio" ? "Radio" : "Dropdown"} Choices (one per line or comma-separated)
                         </label>
                         <input
                           id="nf-options"
                           value={newField.options}
                           onChange={(e) => setNewField({ ...newField, options: e.target.value })}
-                          placeholder="e.g. 1st Year, 2nd Year, 3rd Year, 4th Year"
+                          placeholder="e.g. Vegetarian, Vegan, Gluten-free"
                         />
                       </div>
                     ) : null}
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
-                      <label className="check-row" style={{ margin: 0 }}>
-                        <input
-                          type="checkbox"
-                          checked={newField.required}
-                          onChange={(e) => setNewField({ ...newField, required: e.target.checked })}
-                        />
-                        Required field
-                      </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 14, flexWrap: "wrap" }}>
+                      {/* Required toggle for Add Field form */}
+                      <button
+                        type="button"
+                        className={`field-required-toggle ${newField.required ? "is-required" : "is-optional"}`}
+                        onClick={() => setNewField({ ...newField, required: !newField.required })}
+                        title={newField.required ? "Click to make optional" : "Click to make required"}
+                        aria-pressed={newField.required}
+                      >
+                        <span className="frt-track">
+                          <span className="frt-thumb" />
+                        </span>
+                        <span className="frt-label">
+                          {newField.required ? (
+                            <><FontAwesomeIcon icon={faCheck} /> Required</>
+                          ) : (
+                            <><span className="frt-q">?</span> Optional</>
+                          )}
+                        </span>
+                      </button>
                       <button className="btn btn-accent btn-sm" type="submit" disabled={savingField}>
                         <FontAwesomeIcon icon={savingField ? faSpinner : faPlus} spin={savingField} /> Add Field
                       </button>
@@ -1223,62 +1441,167 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 </div>
               </div>
 
-              {/* Right: Live Preview */}
+              {/* Right: Interactive Live Preview */}
               <div className="reg-builder-right">
-                <div className="reg-preview-header">
-                  <span className="panel-kicker" style={{ margin: 0, fontSize: 11 }}>Live Form Preview</span>
-                  <span className="badge" style={{ fontSize: 10 }}>Attendee View</span>
+                <div className="reg-preview-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <span className="panel-kicker" style={{ margin: 0, fontSize: 11 }}>Live Form Preview</span>
+                    <span className="badge" style={{ fontSize: 10, marginLeft: 6 }}>Attendee View</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: "3px 8px", fontSize: 11, gap: 4 }}
+                    onClick={() => setPreviewResponses({})}
+                    title="Clear test inputs in preview"
+                  >
+                    <FontAwesomeIcon icon={faRotateRight} /> Reset preview
+                  </button>
                 </div>
-                <div className="preview-form-box" style={{ opacity: 0.95, pointerEvents: "none" }}>
-                  <div className="field" style={{ margin: "0 0 10px" }}>
-                    <label style={{ fontSize: 12 }}>Full Name *</label>
-                    <input readOnly placeholder="e.g. Priya Sharma" style={{ padding: "8px 12px", fontSize: 13 }} />
+
+                <div className="preview-form-box" style={{ opacity: 1 }}>
+                  <div className="field" style={{ margin: "0 0 12px" }}>
+                    <label style={{ fontSize: 12, fontWeight: 700 }}>Full Name *</label>
+                    <input
+                      value={previewResponses["name"] ?? ""}
+                      onChange={(e) => setPreviewResponses((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g. Priya Sharma"
+                      style={{ padding: "8px 12px", fontSize: 13 }}
+                    />
                   </div>
-                  <div className="field" style={{ margin: "0 0 10px" }}>
-                    <label style={{ fontSize: 12 }}>Email Address *</label>
-                    <input readOnly placeholder="priya@example.com" style={{ padding: "8px 12px", fontSize: 13 }} />
+                  <div className="field" style={{ margin: "0 0 12px" }}>
+                    <label style={{ fontSize: 12, fontWeight: 700 }}>Email Address *</label>
+                    <input
+                      type="email"
+                      value={previewResponses["email"] ?? ""}
+                      onChange={(e) => setPreviewResponses((p) => ({ ...p, email: e.target.value }))}
+                      placeholder="priya@example.com"
+                      style={{ padding: "8px 12px", fontSize: 13 }}
+                    />
                   </div>
-                  <div className="field" style={{ margin: "0 0 10px" }}>
-                    <label style={{ fontSize: 12 }}>Mobile Number *</label>
-                    <input readOnly placeholder="e.g. 9876543210" style={{ padding: "8px 12px", fontSize: 13 }} />
+                  <div className="field" style={{ margin: "0 0 12px" }}>
+                    <label style={{ fontSize: 12, fontWeight: 700 }}>Mobile Number *</label>
+                    <input
+                      type="tel"
+                      value={previewResponses["phone"] ?? ""}
+                      onChange={(e) => setPreviewResponses((p) => ({ ...p, phone: e.target.value }))}
+                      placeholder="e.g. 9876543210"
+                      style={{ padding: "8px 12px", fontSize: 13 }}
+                    />
                   </div>
 
-                  {fields.map((f) => (
-                    <div className="field" style={{ margin: "0 0 10px" }} key={f.id}>
-                      <label style={{ fontSize: 12 }}>
-                        {f.label} {f.required ? "*" : "(Optional)"}
-                      </label>
-                      {f.type === "textarea" ? (
-                        <textarea readOnly placeholder={`Enter ${f.label.toLowerCase()}`} rows={2} style={{ padding: "8px 12px", fontSize: 13 }} />
-                      ) : f.type === "select" ? (
-                        <select disabled style={{ padding: "8px 12px", fontSize: 13 }}>
-                          <option>Select {f.label}…</option>
-                          {f.options.map((opt) => (
-                            <option key={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      ) : f.type === "radio" ? (
-                        <div className="preview-choice-list">
-                          {f.options.map((opt) => (
-                            <label key={opt}>
-                              <input type="radio" disabled name={`preview-${f.id}`} /> {opt}
-                            </label>
-                          ))}
-                        </div>
-                      ) : f.type === "checkbox" ? (
-                        <label>
-                          <input type="checkbox" disabled /> {f.label}
+                  {fields.map((f) => {
+                    const isPairedAge = Boolean(pairedPreviewFields.ageToDob[f.name]);
+                    const val = previewResponses[f.name];
+
+                    return (
+                      <div className="field" style={{ margin: "0 0 14px" }} key={f.id}>
+                        <label style={{ fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+                          <span>
+                            {f.label} {f.required ? <span className="required-star">*</span> : <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>(Optional)</span>}
+                          </span>
+                          {isPairedAge ? (
+                            <span className="autofill-badge">Autofilled from DOB</span>
+                          ) : null}
                         </label>
-                      ) : (
-                        <input
-                          readOnly
-                          type={f.type === "email" ? "email" : f.type === "number" ? "number" : "text"}
-                          placeholder={`Enter ${f.label.toLowerCase()}`}
-                          style={{ padding: "8px 12px", fontSize: 13 }}
-                        />
-                      )}
-                    </div>
-                  ))}
+
+                        {f.type === "textarea" ? (
+                          <textarea
+                            value={String(val ?? "")}
+                            onChange={(e) => handlePreviewChange(f.name, e.target.value, f.type)}
+                            placeholder={`Enter ${f.label.toLowerCase()}`}
+                            rows={2}
+                            style={{ padding: "8px 12px", fontSize: 13 }}
+                          />
+                        ) : f.type === "select" ? (
+                          <select
+                            value={String(val ?? "")}
+                            onChange={(e) => handlePreviewChange(f.name, e.target.value, f.type)}
+                            style={{ padding: "8px 12px", fontSize: 13 }}
+                          >
+                            <option value="">Select {f.label}…</option>
+                            {f.options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : f.type === "radio" ? (
+                          <div className="choice-options-list">
+                            {f.options.map((opt) => {
+                              const isChecked = val === opt;
+                              return (
+                                <label key={opt} className={`choice-option-row ${isChecked ? "is-selected" : ""}`}>
+                                  <input
+                                    type="radio"
+                                    name={`preview-${f.id}`}
+                                    value={opt}
+                                    checked={isChecked}
+                                    onChange={() => handlePreviewChange(f.name, opt, f.type)}
+                                    className="choice-native-input"
+                                  />
+                                  <span className="choice-label-text">{opt}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : f.type === "checkbox" ? (
+                          f.options.length ? (
+                            <div className="choice-options-list">
+                              {f.options.map((opt) => {
+                                const arr = Array.isArray(val) ? val : [];
+                                const isChecked = arr.includes(opt);
+                                return (
+                                  <label key={opt} className={`choice-option-row ${isChecked ? "is-selected" : ""}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) =>
+                                        handlePreviewChange(
+                                          f.name,
+                                          e.target.checked ? [...arr, opt] : arr.filter((x) => x !== opt),
+                                          f.type
+                                        )
+                                      }
+                                      className="choice-native-input"
+                                    />
+                                    <span className="choice-label-text">{opt}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <label className={`choice-option-row single-checkbox ${val === true ? "is-selected" : ""}`}>
+                              <input
+                                type="checkbox"
+                                checked={val === true}
+                                onChange={(e) => handlePreviewChange(f.name, e.target.checked, f.type)}
+                                className="choice-native-input"
+                              />
+                              <span className="choice-label-text">{f.label}</span>
+                            </label>
+                          )
+                        ) : isPairedAge ? (
+                          <input
+                            readOnly
+                            type="text"
+                            value={String(val ?? "")}
+                            placeholder="Auto-calculated (Years.Months)"
+                            className="readonly-autofilled-input"
+                            style={{ padding: "8px 12px", fontSize: 13 }}
+                          />
+                        ) : (
+                          <input
+                            type={f.type === "phone" ? "tel" : f.type}
+                            value={String(val ?? "")}
+                            onChange={(e) => handlePreviewChange(f.name, e.target.value, f.type)}
+                            placeholder={`Enter ${f.label.toLowerCase()}`}
+                            style={{ padding: "8px 12px", fontSize: 13 }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
 
                   <button className="btn btn-accent btn-sm" style={{ width: "100%", marginTop: 12 }} disabled>
                     {info.eventType === "free" ? "Register for Free" : `Pay & Register (${formatCurrency(info.price)})`}
@@ -1295,6 +1618,109 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 Continue to Review <FontAwesomeIcon icon={faArrowRight} />
               </button>
             </div>
+
+            {/* Custom Field Edit Popup Modal */}
+            {editingField ? (
+              <div className="custom-field-modal-backdrop" onClick={() => !updatingField && setEditingField(null)}>
+                <div className="custom-field-modal-card" onClick={(e) => e.stopPropagation()}>
+                  <div className="custom-field-modal-header">
+                    <h3>Edit Custom Field</h3>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => !updatingField && setEditingField(null)}
+                      aria-label="Close modal"
+                    >
+                      <FontAwesomeIcon icon={faXmark} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveEditField} noValidate>
+                    <div className="field">
+                      <label htmlFor="ef-label">Field Label</label>
+                      <input
+                        id="ef-label"
+                        value={editingField.label}
+                        onChange={(e) => setEditingField({ ...editingField, label: e.target.value })}
+                        placeholder="e.g. Date of Birth"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="field" style={{ marginTop: 12 }}>
+                      <label htmlFor="ef-type">Field Type</label>
+                      <select
+                        id="ef-type"
+                        value={editingField.type}
+                        onChange={(e) => setEditingField({ ...editingField, type: e.target.value as FieldType })}
+                      >
+                        {FIELD_TYPES.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {["select", "radio", "checkbox"].includes(editingField.type) ? (
+                      <div className="field" style={{ marginTop: 12 }}>
+                        <label htmlFor="ef-options">
+                          {editingField.type === "checkbox" ? "Checkbox" : editingField.type === "radio" ? "Radio" : "Dropdown"} Choices (one per line or comma-separated)
+                        </label>
+                        <textarea
+                          id="ef-options"
+                          rows={4}
+                          value={editingField.options}
+                          onChange={(e) => setEditingField({ ...editingField, options: e.target.value })}
+                          placeholder="e.g. Option 1&#10;Option 2"
+                          style={{ padding: "8px 12px", fontSize: 13, minHeight: 80 }}
+                        />
+                      </div>
+                    ) : null}
+
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 8 }}>Visibility</div>
+                      <button
+                        type="button"
+                        className={`field-required-toggle lg ${editingField.required ? "is-required" : "is-optional"}`}
+                        onClick={() => setEditingField({ ...editingField, required: !editingField.required })}
+                        aria-pressed={editingField.required}
+                      >
+                        <span className="frt-track">
+                          <span className="frt-thumb" />
+                        </span>
+                        <span className="frt-label">
+                          {editingField.required ? (
+                            <><FontAwesomeIcon icon={faCheck} /> <strong>Required</strong> — attendees must fill this</>  
+                          ) : (
+                            <><span className="frt-q">?</span> <strong>Optional</strong> — attendees can skip this</>
+                          )}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="custom-field-modal-actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setEditingField(null)}
+                        disabled={updatingField}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-accent"
+                        disabled={updatingField}
+                      >
+                        {updatingField ? <FontAwesomeIcon icon={faSpinner} spin /> : null} Save Changes
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

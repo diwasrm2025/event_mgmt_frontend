@@ -1,7 +1,7 @@
 "use client";
 import { ProgressLoader } from "@/components/ui/ProgressLoader";
 
-import { registrationClosed, formatRegistrationDeadline, ageThisYear, isDobField } from "@/lib/registration";
+import { registrationClosed, formatRegistrationDeadline, isDobField, pairDobAndAgeFields, calculateAgeWithMonths } from "@/lib/registration";
 import { ShareEventLink } from "./ShareEventLink";
 import { EventBannerSlider } from "./EventBannerSlider";
 import { apiRequest } from "@/lib/api";
@@ -77,7 +77,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   const [phone, setPhone] = useState("");
 
   const [responses, setResponses] = useState<
-    Record<string, string | boolean>
+    Record<string, string | boolean | string[]>
   >({});
 
   const [stage, setStage] = useState<Stage>("details");
@@ -85,6 +85,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   const [receipt, setReceipt] = useState<BookingItem | null>(null);
 
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const bookingInFlight = useRef(false);
 
@@ -224,7 +225,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
    */
   const setResponse = (
     field: EventFormFieldItem,
-    value: string | boolean,
+    value: string | boolean | string[],
   ) => {
     setResponses((current) => ({
       ...current,
@@ -235,8 +236,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   /*
    * Registration details validation
    */
-  function reportDetailsError(message: string) {
+  function reportDetailsError(message: string, fieldName?: string) {
     setError(message);
+    if (fieldName) setFieldErrors((prev) => ({ ...prev, [fieldName]: message }));
   }
 
   /*
@@ -246,6 +248,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     e.preventDefault();
 
     setError("");
+    setFieldErrors({});
 
     if (name.trim().length < 2 || !email.trim() || !phone.trim()) {
       return reportDetailsError(
@@ -260,9 +263,8 @@ export function PublicEventBooking({ slug }: { slug: string }) {
       return reportDetailsError("Ticket pricing is unavailable. Please contact the organizer.");
     }
     for (const field of bookedEvent.fields ?? []) {
-      if (isDobField(field) && responses[field.name] && ageThisYear(responses[field.name]) === null) return reportDetailsError("Enter a valid date of birth that is not in the future.");
       const message = validateRegistrationField(field, responses[field.name]);
-      if (message) return reportDetailsError(message);
+      if (message) return reportDetailsError(message, field.name);
     }
 
     if (isFree) {
@@ -512,17 +514,37 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                       required
                     />
 
-                    {(event.fields ?? []).map(
-                      (field) => (
-                        <div key={field.id}><RegistrationField
-                          field={field}
-                          value={
-                            responses[field.name]
-                          }
-                          onChange={setResponse}
-                        />{isDobField(field) && <p className="hint">Age in {new Date().getFullYear()}: {ageThisYear(responses[field.name]) ?? "Enter a valid date of birth"}</p>}</div>
-                      ),
-                    )}
+                    {(() => {
+                      const fields = event.fields ?? [];
+                      const { dobToAge, ageToDob } = pairDobAndAgeFields(fields);
+                      return fields.map((field) => {
+                        // Age fields paired to a DOB are hidden — they auto-fill
+                        if (ageToDob[field.name]) return null;
+                        // If this DOB field has a paired age field, pass its name and the computed value
+                        const pairedAgeName = dobToAge[field.name];
+                        const autoAge = (pairedAgeName && calculateAgeWithMonths(responses[field.name])) || undefined;
+                        return (
+                          <RegistrationField
+                            key={field.id}
+                            field={field}
+                            value={responses[field.name]}
+                            autoAge={autoAge}
+                            pairedAgeName={pairedAgeName}
+                            error={fieldErrors[field.name]}
+                            onChange={(f, v) => {
+                              setResponse(f, v);
+                              // Clear per-field error on change
+                              if (fieldErrors[f.name]) setFieldErrors((prev) => { const n = { ...prev }; delete n[f.name]; return n; });
+                              // When DOB changes, also update paired age field
+                              if (pairedAgeName) {
+                                const computed = calculateAgeWithMonths(v as string);
+                                setResponses((cur) => ({ ...cur, [pairedAgeName]: computed ?? "" }));
+                              }
+                            }}
+                          />
+                        );
+                      });
+                    })()}
 
                     <button
                       className="btn btn-vibrant"
@@ -531,7 +553,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     >
                       {isFree ? "Register for free" : "Continue to payment"}
                     </button>
-                    {error && <p className="hint" role="alert">{error}</p>}
+                    {error && <p className="form-error-message" role="alert">{error}</p>}
                   </form>
                 )}
 
@@ -815,132 +837,197 @@ function Field({
 function RegistrationField({
   field,
   value,
+  autoAge,
+  pairedAgeName,
+  error,
   onChange,
 }: {
   field: EventFormFieldItem;
-  value: string | boolean | undefined;
+  value: string | boolean | string[] | undefined;
+  autoAge?: string;
+  pairedAgeName?: string;
+  error?: string;
   onChange: (
     field: EventFormFieldItem,
-    value: string | boolean,
+    value: string | boolean | string[],
   ) => void;
 }) {
   const id = useId();
+  const hasError = !!error;
+
   if (field.type === "textarea") {
     return (
-      <div className="field">
-        <label htmlFor={id}>{field.label}{field.required ? " *" : ""}</label>
-        <textarea id={id} value={String(value ?? "")} required={field.required}
-          onChange={(e) => onChange(field, e.target.value)} rows={4} />
+      <div className={`field${hasError ? " field-has-error" : ""}`}>
+        <label htmlFor={id}>
+          {field.label}
+          {field.required ? <span className="field-required-star"> *</span> : ""}
+        </label>
+        <textarea
+          id={id}
+          value={String(value ?? "")}
+          required={field.required}
+          aria-invalid={hasError}
+          placeholder={`Enter ${field.label.toLowerCase()}`}
+          onChange={(e) => onChange(field, e.target.value)}
+          rows={4}
+        />
+        {hasError && <p className="field-inline-error" role="alert">{error}</p>}
       </div>
     );
   }
-  if (field.type === "checkbox") {
-    return (
-      <label className="registration-checkbox">
-        <input
-          type="checkbox"
-          checked={value === true}
-          onChange={(e) =>
-            onChange(
-              field,
-              e.target.checked,
-            )
-          }
-        />
 
-        <span>
-          <b>Checkbox</b> ·{" "}
-          {field.label}
-          {field.required ? " *" : ""}
-        </span>
-      </label>
+  if (field.type === "checkbox") {
+    if (field.options.length) {
+      const selected = Array.isArray(value) ? value : [];
+      return (
+        <fieldset className={`registration-choice-group${hasError ? " field-has-error" : ""}`}>
+          <legend>
+            {field.label}
+            {field.required ? <span className="field-required-star"> *</span> : ""}
+          </legend>
+          <div className="choice-options-list">
+            {field.options.map((option) => (
+              <label key={option} className="choice-option-row">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option)}
+                  onChange={(e) =>
+                    onChange(
+                      field,
+                      e.target.checked
+                        ? [...selected, option]
+                        : selected.filter((item) => item !== option),
+                    )
+                  }
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+          {hasError && <p className="field-inline-error" role="alert">{error}</p>}
+        </fieldset>
+      );
+    }
+    // Single boolean checkbox
+    return (
+      <div className={`field${hasError ? " field-has-error" : ""}`}>
+        <label className="registration-checkbox">
+          <input
+            type="checkbox"
+            checked={value === true}
+            onChange={(e) => onChange(field, e.target.checked)}
+          />
+          <span>
+            {field.label}
+            {field.required ? <span className="field-required-star"> *</span> : ""}
+          </span>
+        </label>
+        {hasError && <p className="field-inline-error" role="alert">{error}</p>}
+      </div>
     );
   }
 
   if (field.type === "select") {
     return (
-      <div className="field">
-        <label>
-          <b>Dropdown</b> ·{" "}
+      <div className={`field${hasError ? " field-has-error" : ""}`}>
+        <label htmlFor={id}>
           {field.label}
-          {field.required ? " *" : ""}
+          {field.required ? <span className="field-required-star"> *</span> : ""}
         </label>
-
         <select
+          id={id}
           value={String(value ?? "")}
-          onChange={(e) =>
-            onChange(
-              field,
-              e.target.value,
-            )
-          }
+          aria-invalid={hasError}
+          onChange={(e) => onChange(field, e.target.value)}
         >
-          <option value="">
-            Choose{" "}
-            {field.label.toLowerCase()}
-            ...
-          </option>
-
+          <option value="">Choose {field.label.toLowerCase()}…</option>
           {field.options.map((option) => (
-            <option
-              key={option}
-              value={option}
-            >
-              {option}
-            </option>
+            <option key={option} value={option}>{option}</option>
           ))}
         </select>
+        {hasError && <p className="field-inline-error" role="alert">{error}</p>}
       </div>
     );
   }
 
   if (field.type === "radio") {
     return (
-      <fieldset className="registration-radio">
+      <fieldset className={`registration-choice-group${hasError ? " field-has-error" : ""}`}>
         <legend>
-          <b>Radio</b> ·{" "}
           {field.label}
-          {field.required ? " *" : ""}
+          {field.required ? <span className="field-required-star"> *</span> : ""}
         </legend>
-
-        {field.options.map((option) => (
-          <label key={option}>
-            <input
-              type="radio"
-              name={field.name}
-              checked={value === option}
-              onChange={() =>
-                onChange(
-                  field,
-                  option,
-                )
-              }
-            />
-
-            {" "}
-            {option}
-          </label>
-        ))}
+        <div className="choice-options-list">
+          {field.options.map((option) => (
+            <label key={option} className="choice-option-row">
+              <input
+                type="radio"
+                name={field.name}
+                checked={value === option}
+                onChange={() => onChange(field, option)}
+              />
+              <span>{option}</span>
+            </label>
+          ))}
+        </div>
+        {hasError && <p className="field-inline-error" role="alert">{error}</p>}
       </fieldset>
     );
   }
 
+  // DOB field — show paired age auto-computed below
+  if (isDobField(field)) {
+    return (
+      <div className={`field${hasError ? " field-has-error" : ""}`}>
+        <label htmlFor={id}>
+          {field.label}
+          {field.required ? <span className="field-required-star"> *</span> : ""}
+        </label>
+        <input
+          id={id}
+          type="date"
+          value={String(value ?? "")}
+          required={field.required}
+          aria-invalid={hasError}
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => onChange(field, e.target.value)}
+        />
+        {pairedAgeName && (
+          <div className="dob-age-badge">
+            <span className="dob-age-label">Age (auto-calculated)</span>
+            <input
+              type="text"
+              readOnly
+              value={autoAge ?? ""}
+              placeholder="Fills automatically"
+              className="dob-age-readonly"
+              tabIndex={-1}
+            />
+          </div>
+        )}
+        {hasError && <p className="field-inline-error" role="alert">{error}</p>}
+      </div>
+    );
+  }
+
+  // Generic text / number / email / tel / date fields
   return (
-    <Field
-      label={`${field.label}${
-        field.required ? " *" : ""
-      }`}
-      value={String(value ?? "")}
-      onChange={(v) =>
-        onChange(field, v)
-      }
-      required={field.required}
-      type={
-        field.type === "phone"
-          ? "tel"
-          : field.type
-      }
-    />
+    <div className={`field${hasError ? " field-has-error" : ""}`}>
+      <label htmlFor={id}>
+        {field.label}
+        {field.required ? <span className="field-required-star"> *</span> : ""}
+      </label>
+      <input
+        id={id}
+        type={field.type === "phone" ? "tel" : field.type || "text"}
+        value={String(value ?? "")}
+        required={field.required}
+        aria-invalid={hasError}
+        placeholder={field.type === "date" ? undefined : `Enter ${field.label.toLowerCase()}`}
+        onChange={(e) => onChange(field, e.target.value)}
+      />
+      {hasError && <p className="field-inline-error" role="alert">{error}</p>}
+    </div>
   );
 }
 
@@ -967,23 +1054,14 @@ function SuccessReceipt({
     receipt.registrationStatus ===
     "rejected";
 
+  const statusClass = paymentCompleted ? "is-completed" : isRejected ? "is-rejected" : "is-pending";
+  const bookingRef = receipt.id ? String(receipt.id).slice(0, 8).toUpperCase() : "—";
+
   return (
     <div className="ticket-stub-wrap">
-      <div
-        className={`payment-review-banner ${
-          paymentCompleted
-            ? "is-completed"
-            : isRejected
-              ? "is-rejected"
-              : "is-pending"
-        }`}
-      >
-        <FontAwesomeIcon
-          icon={faCircleCheck}
-        />
-
-        {" "}
-
+      {/* Status banner */}
+      <div className={`payment-review-banner ${statusClass}`}>
+        <FontAwesomeIcon icon={faCircleCheck} />{" "}
         {isFree ? "Registration confirmed" : PAYMENT_STATUS_LABELS[receipt.paymentStatus]}
       </div>
 
@@ -1001,46 +1079,75 @@ function SuccessReceipt({
 
       {!isFree && <PaymentStatusActions href={paymentStatusLink(receipt)} />}
 
-      {!isFree && isRejected &&
-        receipt.rejectionReason && (
-          <p className="payment-review-banner is-rejected">
-            Reason:{" "}
-            {receipt.rejectionReason}
-          </p>
-        )}
+      {!isFree && isRejected && receipt.rejectionReason && (
+        <p className="payment-review-banner is-rejected">
+          Reason: {receipt.rejectionReason}
+        </p>
+      )}
 
-      <div className="ticket-stub">
-        <div className="ticket-stub-hero-title">
-          {event.title}
+      {/* ── Premium Ticket Card ── */}
+      <div className="ticket-card">
+        {/* Ticket header */}
+        <div className="ticket-card-header">
+          <div className="ticket-card-eyebrow">✦ Admission Ticket</div>
+          <div className="ticket-card-event-name">{event.title}</div>
+          <div className="ticket-card-meta">
+            <span>📅 {date.full}</span>
+            <span>📍 {event.eventMode === "online" ? "Online Event" : (event.venue || "TBA")}</span>
+            {event.time && <span>⏰ {timeLabel(event.time ?? "")}</span>}
+          </div>
         </div>
 
-        <div className="ticket-stub-hero-meta">
-          <span>{date.full}</span>
-
-          <span>
-            {event.eventMode === "online"
-              ? "Online event"
-              : event.venue}
-          </span>
+        {/* Perforated divider */}
+        <div className="ticket-card-perforation">
+          <div className="ticket-perf-circle ticket-perf-left" />
+          <div className="ticket-perf-dashes" />
+          <div className="ticket-perf-circle ticket-perf-right" />
         </div>
 
-        <div className="ticket-stub-body">
-          <strong>{receipt.name}</strong>
+        {/* Ticket body */}
+        <div className="ticket-card-body">
+          <div className="ticket-card-attendee">
+            <span className="ticket-card-field-label">Attendee</span>
+            <span className="ticket-card-field-value">{receipt.name}</span>
+          </div>
+          <div className="ticket-card-row">
+            <div className="ticket-card-col">
+              <span className="ticket-card-field-label">Booking Ref</span>
+              <span className="ticket-card-field-value mono"># {bookingRef}</span>
+            </div>
+            <div className="ticket-card-col">
+              <span className="ticket-card-field-label">Status</span>
+              <span className={`ticket-card-status-pill ${statusClass}`}>
+                {isFree ? "Confirmed" : PAYMENT_STATUS_LABELS[receipt.paymentStatus]}
+              </span>
+            </div>
+          </div>
 
-          <span>{isFree ? "Free registration confirmed" : PAYMENT_STATUS_LABELS[receipt.paymentStatus]}</span>
+          {(isPaid || isFree) && event.eventMode === "online" && event.onlineUrl && (
+            <a
+              href={event.onlineUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="ticket-card-join-btn"
+            >
+              Join Online Event →
+            </a>
+          )}
+        </div>
 
-          {(isPaid || isFree) &&
-            event.eventMode ===
-              "online" &&
-            event.onlineUrl && (
-              <a
-                href={event.onlineUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Join online event
-              </a>
-            )}
+        {/* Barcode strip */}
+        <div className="ticket-card-barcode-strip">
+          <div className="ticket-barcode-lines" aria-hidden="true">
+            {Array.from({ length: 42 }).map((_, i) => (
+              <div
+                key={i}
+                className="ticket-barcode-bar"
+                style={{ height: i % 5 === 0 ? "38px" : i % 3 === 0 ? "28px" : "22px" } as CSSProperties}
+              />
+            ))}
+          </div>
+          <div className="ticket-barcode-num">{receipt.id ? String(receipt.id).toUpperCase() : "—"}</div>
         </div>
       </div>
     </div>

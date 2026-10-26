@@ -39,8 +39,8 @@ test("attendee contact validation accepts formatted phones and rejects malformed
 
 test("required text rejects whitespace and required checkbox needs consent", () => {
   assert.ok(validateRegistrationField(field("text"), "   "));
-  assert.ok(validateRegistrationField(field("checkbox"), false));
-  assert.equal(validateRegistrationField(field("checkbox"), true), null);
+  assert.ok(validateRegistrationField({ ...field("checkbox"), options: [] }, false));
+  assert.equal(validateRegistrationField({ ...field("checkbox"), options: [] }, true), null);
   assert.equal(validateRegistrationField(field("text", false), ""), null);
 });
 
@@ -51,4 +51,11 @@ test("custom fields validate email, phone, number, date and allowed choices", ()
   for (const [type, value] of [["number", "0"], ["number", "-1.5"], ["select", "One"], ["radio", "Two"], ["textarea", "A longer answer"]]) {
     assert.equal(validateRegistrationField(field(type), value), null);
   }
+});
+
+test("checkbox choice fields accept multiple allowed choices and enforce required selections", () => {
+  const choices = { ...field("checkbox"), options: ["One", "Two"] };
+  assert.equal(validateRegistrationField(choices, ["One", "Two"]), null);
+  assert.ok(validateRegistrationField(choices, []));
+  assert.ok(validateRegistrationField(choices, ["Other"]));
 });

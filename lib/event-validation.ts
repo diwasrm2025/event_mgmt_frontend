@@ -29,7 +29,12 @@ export function isValidCapacity(value: number, bookedSeats = 0) {
   return Number.isSafeInteger(value) && value >= Math.max(1, bookedSeats) && value <= 2147483647;
 }
 
-export function validateRegistrationField(field: EventFormFieldItem, value: string | boolean | undefined): string | null {
+export function validateRegistrationField(field: EventFormFieldItem, value: string | boolean | string[] | undefined): string | null {
+  if (field.type === "checkbox" && field.options.length) {
+    const selected = Array.isArray(value) ? value : [];
+    if (selected.some((option) => !field.options.includes(option))) return `Choose valid options for "${field.label}".`;
+    return field.required && selected.length === 0 ? `"${field.label}" is required.` : null;
+  }
   const text = typeof value === "string" ? value.trim() : "";
   if (field.type === "checkbox") return field.required && value !== true ? `"${field.label}" is required.` : null;
   if (!text) return field.required ? `"${field.label}" is required.` : null;

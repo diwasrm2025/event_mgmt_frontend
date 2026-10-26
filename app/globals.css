@@ -693,7 +693,11 @@ html, body {
   background: var(--surface-strong);
   box-shadow: var(--shadow-soft);
   transition: border-color 0.15s ease, transform 0.15s ease;
+  cursor: grab;
 }
+
+.field-builder-row.dragging { opacity: 0.55; }
+.field-drag-handle { color: var(--text-faint); display: inline-flex; padding-top: 3px; cursor: grab; }
 
 .field-builder-row::before {
   content: "";
@@ -6949,7 +6953,7 @@ textarea::placeholder {
 .event-experience .registration-form .field { margin: 0; }
 .event-experience .registration-form input, .event-experience .registration-form select, .event-experience .registration-form textarea { padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(var(--accent-rgb), .24); background: var(--surface); color: var(--text); }
 .event-experience .registration-form input:focus, .event-experience .registration-form textarea:focus, .event-experience .registration-form select:focus { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: 0 0 24px rgba(var(--accent-rgb), .13); }
-.event-experience .registration-form label { display: block; margin-bottom: 9px; font-weight: 600; }
+.event-experience .registration-form label {margin-bottom: 9px; font-weight: 600; }
 .event-experience .btn-vibrant { padding: 16px 24px; border-radius: 10px; box-shadow: 0 8px 28px -10px var(--accent); font-weight: 750; }
 @media (max-width: 900px) { .event-experience { padding: 24px 22px 64px; } .event-experience .public-event-grid { grid-template-columns: 1fr; gap: 32px; } .event-experience .booking-form-card { position: static; } .experience-heading { gap: 24px; } .experience-entry { min-width: 170px; padding-left: 20px; } }
 @media (max-width: 600px) { .public-discovery-hero { min-height: 430px; } .public-event-card .body { padding: 22px; } .event-experience { padding: 20px 16px 48px; } .experience-heading { grid-template-columns: 1fr; padding: 30px 0; } .experience-entry { padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--border); } .experience-banner { border-radius: 18px; } .experience-banner-fallback { padding: 28px; min-height: 240px; } .event-experience .booking-form-card { padding: 24px 20px; } .event-experience .detail-grid { gap: 10px; } .event-experience .detail-grid > * { padding: 16px; } .experience-deadline { padding: 18px; } }
@@ -7004,3 +7008,525 @@ textarea::placeholder {
 @media(prefers-reduced-motion: reduce) { .progress-word { animation: none; } }
 
 .activity-read-status { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 9000; padding: 6px 20px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); pointer-events: none; white-space: nowrap; }
+
+/* ── Custom Form Fields Builder & Preview Enhancements ──────────────── */
+.builder-field-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.builder-field-status.required {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.32);
+}
+[data-theme="dark"] .builder-field-status.required {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+}
+.builder-field-status.optional {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+[data-theme="dark"] .builder-field-status.optional {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+.badge-q-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--surface);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.field-builder-row.dragging {
+  opacity: 0.45;
+  transform: scale(0.985);
+  box-shadow: none;
+}
+.field-builder-row.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-tint), 0 6px 18px rgba(79, 70, 229, 0.18);
+  transform: translateY(-2px);
+}
+.field-reorder-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 5px 6px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.field-reorder-btn:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--surface-soft);
+}
+.field-reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* Custom Field Edit Popup Modal */
+.custom-field-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(5px);
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modal-fade 0.18s ease;
+}
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.custom-field-modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  width: min(540px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.4);
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: modal-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.custom-field-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+.custom-field-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  color: var(--text);
+}
+.custom-field-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 6px;
+}
+
+/* ── Checkbox & Radio Button Flow Design ────────────────────────────── */
+.registration-choice-group {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  margin-bottom: 16px;
+  background: var(--surface-soft);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.registration-choice-group.has-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+  background: rgba(239, 68, 68, 0.02) !important;
+}
+.choice-group-legend {
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 750;
+  padding: 0 6px;
+  margin-bottom: 8px;
+}
+.choice-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.choice-option-row:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent-tint));
+}
+.choice-option-row.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--text);
+  font-weight: 600;
+}
+.choice-native-input {
+  cursor: pointer;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  margin: 0;
+  flex-shrink: 0;
+}
+.choice-label-text {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.choice-single-wrap {
+  margin-bottom: 16px;
+}
+.choice-option-row.single-checkbox {
+  padding: 12px 14px;
+}
+
+/* ── Field Error Highlight & Message ───────────────────────────────── */
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3.5px rgba(239, 68, 68, 0.16) !important;
+  background: rgba(239, 68, 68, 0.02) !important;
+}
+.field-error-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  margin: 6px 0 0;
+  animation: error-in 0.18s ease;
+}
+@keyframes error-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── DOB & Age Autofill Badges ─────────────────────────────────────── */
+.autofill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 750;
+  color: var(--accent-strong);
+  background: var(--accent-tint);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.readonly-autofilled-input {
+  background: var(--surface-soft) !important;
+  cursor: default !important;
+  font-weight: 650 !important;
+  color: var(--text) !important;
+  border-style: dashed !important;
+}
+
+/* ── Ticket Stub Confirmation Actions ──────────────────────────────── */
+.ticket-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+@media print {
+  body * { visibility: hidden !important; }
+  .ticket-stub-wrap, .ticket-stub-wrap * { visibility: visible !important; }
+  .ticket-stub-wrap { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 20px !important; }
+  .ticket-actions-row, .payment-review-banner { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REGISTRATION FORM — Per-field error highlighting
+═══════════════════════════════════════════════════════════ */
+.field-has-error input,
+.field-has-error textarea,
+.field-has-error select {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+}
+.field-has-error label,
+.field-has-error legend { color: #ef4444 !important; }
+.field-inline-error {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.field-inline-error::before { content: "⚠"; font-size: 11px; }
+.field-required-star { color: #ef4444; font-weight: 700; }
+.form-error-message {
+  margin: 12px 0 0;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-error-message::before { content: "⚠"; }
+
+/* ═══════════════════════════════════════════════════════════
+   DOB → AGE AUTO-FILL BADGE
+═══════════════════════════════════════════════════════════ */
+.dob-age-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(139,92,246,0.06));
+  border: 1px dashed rgba(99,102,241,0.35);
+}
+.dob-age-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-strong, #6366f1);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dob-age-readonly {
+  flex: 1;
+  min-width: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-strong, #6366f1) !important;
+  cursor: default;
+  pointer-events: none;
+}
+.dob-age-readonly::placeholder { color: var(--text-muted, #9ca3af); font-weight: 400; font-style: italic; font-size: 13px; }
+
+/* ═══════════════════════════════════════════════════════════
+   RADIO & MULTI-CHECKBOX — One per line, clean vertical list
+═══════════════════════════════════════════════════════════ */
+.registration-choice-group {
+  border: 1.5px solid var(--border, rgba(0,0,0,0.1));
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  margin: 0;
+}
+.registration-choice-group.field-has-error { border-color: #ef4444 !important; background: rgba(239,68,68,0.03); }
+.registration-choice-group legend { font-size: 13px; font-weight: 650; color: var(--text-muted, #6b7280); padding: 0 6px; letter-spacing: 0.01em; }
+.choice-options-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.choice-option-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+  font-size: 14.5px;
+  color: var(--text, #172033);
+}
+.choice-option-row:hover { background: var(--surface-soft, rgba(99,102,241,0.06)); }
+.choice-option-row input[type="radio"],
+.choice-option-row input[type="checkbox"] {
+  width: 17px; height: 17px;
+  flex-shrink: 0;
+  accent-color: var(--accent-strong, #6366f1);
+  cursor: pointer;
+}
+.registration-checkbox { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.registration-checkbox input[type="checkbox"] { width: 17px; height: 17px; flex-shrink: 0; accent-color: var(--accent-strong, #6366f1); }
+
+/* ═══════════════════════════════════════════════════════════
+   PREMIUM TICKET CARD — Booking Confirmation
+═══════════════════════════════════════════════════════════ */
+.ticket-stub-wrap { display: grid; gap: 18px; max-width: 520px; margin: 0 auto; }
+
+.ticket-card {
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+  border: 1.5px solid rgba(99,102,241,0.18);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06), 0 20px 60px -12px rgba(99,102,241,0.2);
+}
+.ticket-card-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6366f1 100%);
+  padding: 26px 28px 22px;
+  color: #fff;
+}
+.ticket-card-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; margin-bottom: 8px; }
+.ticket-card-event-name { font-size: clamp(18px, 4vw, 24px); font-weight: 800; line-height: 1.2; margin-bottom: 14px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.ticket-card-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; font-weight: 500; opacity: 0.88; }
+.ticket-card-meta span { white-space: nowrap; }
+
+/* Perforated divider */
+.ticket-card-perforation { display: flex; align-items: center; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6366f1 100%); height: 2px; }
+.ticket-perf-dashes { flex: 1; border-top: 2px dashed rgba(255,255,255,0.4); margin: 0 4px; }
+.ticket-perf-circle { width: 22px; height: 22px; border-radius: 50%; background: var(--bg, #f3f4f6); flex-shrink: 0; margin: -11px 0; z-index: 2; border: 1.5px solid rgba(99,102,241,0.15); }
+.ticket-perf-left  { margin-left: -11px; }
+.ticket-perf-right { margin-right: -11px; }
+
+/* Ticket body */
+.ticket-card-body { padding: 22px 28px 20px; display: grid; gap: 16px; }
+.ticket-card-attendee { display: flex; flex-direction: column; gap: 2px; }
+.ticket-card-field-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted, #9ca3af); }
+.ticket-card-field-value { font-size: 16px; font-weight: 700; color: var(--text, #172033); line-height: 1.3; }
+.ticket-card-field-value.mono { font-family: 'Courier New', Courier, monospace; font-size: 14px; letter-spacing: 0.05em; }
+.ticket-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ticket-card-col { display: flex; flex-direction: column; gap: 3px; }
+.ticket-card-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  width: fit-content;
+}
+.ticket-card-status-pill.is-completed { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.ticket-card-status-pill.is-pending   { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.ticket-card-status-pill.is-rejected  { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.ticket-card-join-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 11px 20px; border-radius: 10px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff !important; font-size: 14px; font-weight: 700; text-decoration: none;
+  transition: opacity 0.18s, transform 0.18s; margin-top: 4px;
+}
+.ticket-card-join-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+/* Barcode strip */
+.ticket-card-barcode-strip {
+  padding: 16px 28px 18px;
+  border-top: 1px dashed var(--border, rgba(0,0,0,0.1));
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: var(--surface-soft, rgba(99,102,241,0.03));
+}
+.ticket-barcode-lines { display: flex; align-items: flex-end; gap: 2.5px; height: 42px; }
+.ticket-barcode-bar { width: 2.5px; border-radius: 1px; background: var(--text, #172033); opacity: 0.75; flex-shrink: 0; }
+.ticket-barcode-num { font-family: 'Courier New', Courier, monospace; font-size: 10px; letter-spacing: 0.15em; color: var(--text-muted, #9ca3af); text-transform: uppercase; }
+
+/* Dark mode */
+[data-theme="dark"] .ticket-card { background: var(--surface, #1e1e2e); border-color: rgba(99,102,241,0.25); }
+[data-theme="dark"] .ticket-perf-circle { background: var(--bg, #13131f); border-color: rgba(99,102,241,0.3); }
+[data-theme="dark"] .ticket-card-status-pill.is-completed { background: rgba(22,163,74,0.18); color: #4ade80; border-color: rgba(74,222,128,0.3); }
+[data-theme="dark"] .ticket-card-status-pill.is-pending   { background: rgba(234,179,8,0.12);  color: #facc15; border-color: rgba(250,204,21,0.3); }
+[data-theme="dark"] .ticket-card-status-pill.is-rejected  { background: rgba(220,38,38,0.15);  color: #f87171; border-color: rgba(248,113,113,0.3); }
+[data-theme="dark"] .ticket-barcode-bar { opacity: 0.45; }
+[data-theme="dark"] .registration-choice-group { border-color: rgba(99,102,241,0.2); }
+[data-theme="dark"] .dob-age-badge { background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.08)); border-color: rgba(99,102,241,0.3); }
+
+/* Print */
+@media print {
+  .ticket-card { box-shadow: none !important; border-color: #ccc !important; }
+  .ticket-card-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* -----------------------------------------------------------
+   CUSTOM FIELD CARDS � EventWizard Step 3
+----------------------------------------------------------- */
+.field-builder-list { display: flex; flex-direction: column; gap: 10px; }
+.field-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 14px;
+  background: var(--surface, #fff);
+  border: 1.5px solid var(--border, rgba(0,0,0,0.09));
+  border-radius: 14px;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.field-card:hover { border-color: var(--accent, #6366f1); box-shadow: 0 4px 18px -4px rgba(99,102,241,0.15); }
+.field-card.dragging { opacity: 0.45; transform: scale(0.98); border-style: dashed; border-color: var(--accent, #6366f1); }
+.field-card.drag-over { border-color: var(--accent, #6366f1); box-shadow: 0 0 0 3px rgba(99,102,241,0.18); transform: translateY(-2px); }
+.field-card-drag-col { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+.field-drag-handle { cursor: grab; color: var(--text-muted, #9ca3af); font-size: 14px; padding: 2px 4px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.field-drag-handle:hover { color: var(--accent, #6366f1); background: var(--accent-tint, rgba(99,102,241,0.08)); }
+.field-reorder-btn { background: none; border: none; cursor: pointer; color: var(--text-muted, #9ca3af); padding: 2px 5px; font-size: 10px; border-radius: 4px; transition: color 0.15s, background 0.15s; line-height: 1; }
+.field-reorder-btn:hover:not(:disabled) { color: var(--accent, #6366f1); background: var(--accent-tint); }
+.field-reorder-btn:disabled { opacity: 0.25; cursor: default; }
+.field-card-icon-badge { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10)); border: 1px solid rgba(99,102,241,0.2); display: flex; align-items: center; justify-content: center; color: var(--accent-strong, #6366f1); font-size: 15px; flex-shrink: 0; }
+.field-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.field-card-label { font-size: 14px; font-weight: 700; color: var(--text, #172033); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-card-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.field-type-chip { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: var(--surface-soft, rgba(99,102,241,0.07)); color: var(--accent-strong, #6366f1); border: 1px solid rgba(99,102,241,0.2); }
+.field-options-chip { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; background: var(--surface-soft, rgba(0,0,0,0.04)); color: var(--text-muted, #6b7280); border: 1px solid var(--border, rgba(0,0,0,0.08)); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-card-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.field-card-edit-btn { padding: 5px 11px !important; font-size: 12px !important; gap: 5px; }
+.field-empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 20px; border: 1.5px dashed var(--border-strong, rgba(0,0,0,0.15)); border-radius: 14px; text-align: center; color: var(--text-muted, #9ca3af); font-size: 13.5px; line-height: 1.55; }
+
+/* -----------------------------------------------------------
+   REQUIRED / OPTIONAL TOGGLE SWITCH
+----------------------------------------------------------- */
+.field-required-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 8px; border-radius: 999px;
+  border: 1.5px solid transparent; background: none;
+  cursor: pointer; font-size: 12px; font-weight: 700;
+  line-height: 1; transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  white-space: nowrap; user-select: none;
+}
+.field-required-toggle.lg { padding: 9px 18px 9px 12px; font-size: 13.5px; border-radius: 12px; }
+.field-required-toggle.is-required { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.35); color: #15803d; }
+.field-required-toggle.is-required:hover { background: rgba(22,163,74,0.14); box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
+.field-required-toggle.is-required .frt-track { background: #16a34a; }
+.field-required-toggle.is-required .frt-thumb { transform: translateX(14px); background: #fff; }
+.field-required-toggle.is-optional { background: rgba(245,158,11,0.07); border-color: rgba(245,158,11,0.3); color: #92400e; }
+.field-required-toggle.is-optional:hover { background: rgba(245,158,11,0.13); box-shadow: 0 0 0 3px rgba(245,158,11,0.12); }
+.field-required-toggle.is-optional .frt-track { background: #d97706; }
+.field-required-toggle.is-optional .frt-thumb { transform: translateX(0); background: #fff; }
+.frt-track { position: relative; width: 28px; height: 16px; border-radius: 999px; flex-shrink: 0; transition: background 0.2s; }
+.frt-thumb { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.frt-label { display: flex; align-items: center; gap: 5px; font-size: inherit; }
+.frt-q { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: #d97706; color: #fff; font-size: 9px; font-weight: 900; line-height: 1; flex-shrink: 0; }
+[data-theme="dark"] .field-card { background: var(--surface, #1e1e2e); border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .field-card:hover { border-color: rgba(99,102,241,0.5); }
+[data-theme="dark"] .field-card-icon-badge { background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.14)); border-color: rgba(99,102,241,0.3); }
+[data-theme="dark"] .field-card-label { color: var(--text, #e2e8f0); }
+[data-theme="dark"] .field-required-toggle.is-required { background: rgba(22,163,74,0.15); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+[data-theme="dark"] .field-required-toggle.is-optional { background: rgba(245,158,11,0.12); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+[data-theme="dark"] .field-type-chip { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.3); }
+[data-theme="dark"] .field-empty-state { border-color: rgba(255,255,255,0.1); }
