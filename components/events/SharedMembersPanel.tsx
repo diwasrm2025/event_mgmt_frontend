@@ -1,6 +1,6 @@
 "use client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ProgressLoader } from "@/components/ui/ProgressLoader";
-import { CrudEmptyState } from "@/components/ui/CrudEmptyState";
 
 import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -71,7 +71,8 @@ export function SharedMembersPanel({
   const [shareQuery, setShareQuery] = useState("");
   const [shareResults, setShareResults] = useState<PersonSummary[]>([]);
   const [selectedUser, setSelectedUser] = useState<PersonSummary | null>(null);
-  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [searchingPeople, setSearchingPeople] = useState(false);
+  const [peopleError, setPeopleError] = useState("");
 
   // New user form
   const [newName, setNewName] = useState("");
@@ -115,25 +116,22 @@ export function SharedMembersPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  // Search existing users in DB
   useEffect(() => {
     if (shareMode !== "existing") return;
+    let active = true;
+    setSearchingPeople(true);
+    setPeopleError("");
+    setShareResults([]);
     const timeout = window.setTimeout(async () => {
       try {
-        setShareResults(await searchPeople(shareQuery.trim()));
+        const results = await searchPeople(shareQuery.trim());
+        if (active) setShareResults(results);
       } catch {
-        setShareResults([]);
-      }
-    }, 200);
-    return () => window.clearTimeout(timeout);
-  }, [shareQuery, shareMode]);
-
-  // Automatically fetch initial user list for "existing" user tab
-  useEffect(() => {
-    if (shareMode === "existing" && !shareQuery) {
-      searchPeople("").then(setShareResults).catch(() => setShareResults([]));
-    }
-  }, [shareMode, shareQuery]);
+        if (active) setPeopleError("Could not search users. Change your search or try again.");
+      } finally { if (active) setSearchingPeople(false); }
+    }, 250);
+    return () => { active = false; window.clearTimeout(timeout); };
+  }, [shareQuery, shareMode, eventId]);
 
   const activeCount = useMemo(() => (members ?? []).filter((m) => m.status === "ACTIVE").length, [members]);
 
@@ -173,7 +171,6 @@ export function SharedMembersPanel({
         setShareMode("new");
         setNewEmail(target.email);
         setNewName(target.email.split("@")[0]);
-        if (!newPassword) setNewPassword("Password123!");
       } else {
         onToast(err instanceof ApiError ? err.message : "Could not share this event.");
       }
@@ -186,7 +183,12 @@ export function SharedMembersPanel({
   const handleCreateNewAndShare = async () => {
     const trimmedEmail = newEmail.trim().toLowerCase();
     const trimmedName = newName.trim() || trimmedEmail.split("@")[0] || "Organizer User";
-    const password = newPassword.trim() || "Password123!";
+    const password = newPassword;
+
+    if (password.length < 8 || password.length > 72) {
+      onToast("Create an initial password between 8 and 72 characters.");
+      return;
+    }
 
     if (!trimmedEmail || !trimmedEmail.includes("@")) {
       onToast("Enter a valid email address (e.g. user@gmail.com).");
@@ -266,7 +268,7 @@ export function SharedMembersPanel({
     <div className="shared-members-panel">
       <div className="shared-members-head">
         <h3>
-          Shared Members <span className="shared-members-count">({activeCount})</span>
+          Team access <span className="shared-members-count">({activeCount})</span>
         </h3>
         <p className="hint">
           Grant View, Attendee Management, and/or Edit access to existing registered users or create a new user account with credentials.
@@ -294,55 +296,32 @@ export function SharedMembersPanel({
 
         {/* Existing User Tab */}
         {shareMode === "existing" ? (
-          <div className="share-search-row-flex">
-            <div className="field" style={{ flex: 1, position: "relative", marginBottom: 0 }}>
-              <label htmlFor="share-query">Select or Search Existing Users</label>
-              <input
-                id="share-query"
-                value={shareQuery}
-                onChange={(e) => setShareQuery(e.target.value)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setTimeout(() => setIsInputFocused(false), 250)}
-                placeholder="Click to select registered user or enter gmail (user@gmail.com)..."
-              />
-              {isInputFocused && shareResults.length ? (
-                <div className="share-search-results">
-                  {shareResults.map((person) => (
-                    <button
-                      type="button"
-                      key={person.id}
-                      className="share-search-row"
-                      disabled={sharing}
-                      onClick={() => handleShareExisting({ userId: person.id }, person.name)}
-                    >
-                      <span className="member-avatar">
-                        {person.avatarUrl ? <img src={person.avatarUrl} alt="" /> : initialsOf(person.name)}
-                      </span>
-                      <span>
-                        <strong>{person.name}</strong>
-                        <span className="hint" style={{ display: "block" }}>
-                          {person.email}
-                        </span>
-                      </span>
-                      <span className="badge">
-                        <FontAwesomeIcon icon={faUserPlus} /> Share
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+          <div className="share-user-picker">
+            <div className="field">
+              <label htmlFor="share-query">Find a registered user</label>
+              <div className="shared-search-input">
+                <FontAwesomeIcon icon={faMagnifyingGlass} aria-hidden="true" />
+                <input id="share-query" value={shareQuery} onChange={e => { setShareQuery(e.target.value); setSelectedUser(null); }} placeholder="Search by name or email address" autoComplete="off" />
+                {shareQuery && <button type="button" className="btn btn-ghost btn-sm" aria-label="Clear user search" onClick={() => { setShareQuery(""); setSelectedUser(null); }}><FontAwesomeIcon icon={faXmark} /></button>}
+              </div>
+              <p className="hint">Select a user, choose their permissions below, then share access.</p>
             </div>
-            {shareQuery.trim() && shareQuery.includes("@") ? (
-              <button
-                type="button"
-                className="btn btn-accent btn-sm"
-                style={{ height: 42, whiteSpace: "nowrap" }}
-                disabled={sharing}
-                onClick={() => handleShareExisting({ email: shareQuery.trim() }, shareQuery.trim())}
-              >
-                <FontAwesomeIcon icon={faUserPlus} /> Share with Email
-              </button>
-            ) : null}
+            <div className="share-user-results" aria-busy={searchingPeople}>
+              {searchingPeople ? <ProgressLoader label="Searching registered users" /> : peopleError ? <p role="alert" className="empty-state">{peopleError}</p> : !shareResults.length ? (
+                <div className="empty-state"><strong>No users found</strong><p className="hint">Try a different name or email, or create a new user account.</p><button type="button" className="btn btn-ghost btn-sm" onClick={() => { setShareMode("new"); if (shareQuery.includes("@")) setNewEmail(shareQuery.trim()); }}>Create a new user</button></div>
+              ) : <>
+                <p className="share-results-caption" role="status">{shareResults.length} user{shareResults.length === 1 ? "" : "s"} found{!shareQuery.trim() ? " ? search to narrow the list" : ""}</p>
+                {shareResults.map(person => {
+                  const alreadyShared = (members ?? []).some(member => member.user.id === person.id && member.status === "ACTIVE");
+                  return <button type="button" key={person.id} className={"share-search-row " + (selectedUser?.id === person.id ? "is-selected" : "")} disabled={sharing || alreadyShared || loading} aria-pressed={selectedUser?.id === person.id} onClick={() => setSelectedUser(person)}>
+                    <span className="member-avatar">{person.avatarUrl ? <img src={person.avatarUrl} alt="" /> : initialsOf(person.name)}</span>
+                    <span className="share-person-info"><strong>{person.name}</strong><span className="hint">{person.email}</span></span>
+                    <span className="badge">{alreadyShared ? "Has access" : selectedUser?.id === person.id ? "Selected" : "Select"}</span>
+                  </button>;
+                })}
+              </>}
+            </div>
+            {selectedUser && <div className="share-selection-summary"><FontAwesomeIcon icon={faUserCheck} /><span>Ready to share with <strong>{selectedUser.name}</strong><span className="hint"> {selectedUser.email}</span></span><button type="button" className="btn btn-ghost btn-sm" disabled={sharing} onClick={() => setSelectedUser(null)}>Clear</button></div>}
           </div>
         ) : (
           /* New User Tab (Name, Email, Password created by owner) */
@@ -371,12 +350,11 @@ export function SharedMembersPanel({
             <div className="field">
               <label htmlFor="nu-pass">Password (Set by Event Owner)</label>
               <div className="input-row">
-                <input
+                <PasswordInput
                   id="nu-pass"
-                  type="text"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Set initial password for this user"
+                  placeholder="Create an initial password (at least 8 characters)" autoComplete="new-password" minLength={8} maxLength={72}
                 />
               </div>
               <div className="hint">The user can log in with this email and password to access the shared event.</div>
@@ -405,6 +383,8 @@ export function SharedMembersPanel({
             ))}
           </div>
         </div>
+
+        {shareMode === "existing" && <button type="button" className="btn btn-accent" style={{ marginTop: 14 }} disabled={sharing || !selectedUser || safeSharePermissions.length === 0} onClick={() => selectedUser && void handleShareExisting({ userId: selectedUser.id }, selectedUser.name)}><FontAwesomeIcon icon={faUserPlus} />{sharing ? "Sharing access?" : "Share access with selected user"}</button>}
 
         {shareMode === "new" ? (
           <button
@@ -446,11 +426,13 @@ export function SharedMembersPanel({
         </select>
       </div>
 
+      <div className="shared-list-summary" role="status"><span>Showing <strong>{visibleMembers.length}</strong> of {members?.length ?? 0} shared users ? {activeCount} active</span><button type="button" className="btn btn-ghost btn-sm" onClick={() => { setSearch(""); setStatusFilter("ACTIVE"); setPermissionFilter("ALL"); setSortBy("date"); }}>Reset filters</button></div>
+
       {/* --- List -------------------------------------------------------- */}
       {loading ? (
         <ProgressLoader label="Loading shared members" />
       ) : visibleMembers.length === 0 ? (
-        <CrudEmptyState name="Shared Access" />
+        <div className="empty-state"><strong>{members?.length ? "No users match your filters" : "No shared users yet"}</strong><p className="hint">{members?.length ? "Try a different search, permission, or status filter." : "Select a registered user above or create an account to share access."}</p></div>
       ) : (
         <div className="shared-members-list">
           {visibleMembers.map((member) => (

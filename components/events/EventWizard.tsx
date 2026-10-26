@@ -101,7 +101,13 @@ const STEPS = [
   },
   {
     id: 4,
-    label: "Review & Publish",
+    label: "Shared Access",
+    icon: faUsers,
+    desc: "Share access and manage your team",
+  },
+  {
+    id: 5,
+    label: "Event Summary",
     icon: faShareNodes,
     desc: "Confirm everything and go live",
   },
@@ -267,7 +273,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     });
     setDetails({ status: !loaded.slug && loaded.status === "draft" ? "published" : loaded.status, featured: loaded.featured, agenda: loaded.agenda.join("\n") });
     setFields((loaded.fields ?? []).slice().sort((a, b) => a.order - b.order));
-    setMaxStepReached((current) => Math.max(current, loaded.slug ? 4 : Math.min(loaded.wizardStep || 1, 4)));
+    setMaxStepReached((current) => Math.max(current, loaded.slug ? 5 : Math.min(loaded.wizardStep || 1, 5)));
   }, []);
 
   useEffect(() => {
@@ -278,7 +284,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         const loaded = await getEvent(eventId);
         if (loaded) {
           hydrateFromEvent(loaded);
-          setStep(loaded.slug ? 4 : Math.min(loaded.wizardStep || 1, 4));
+          setStep(loaded.slug ? 5 : Math.min(loaded.wizardStep || 1, 5));
         } else {
           setError("This event could not be found.");
         }
@@ -642,9 +648,20 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     }
   };
 
-  const finishFields = () => {
-    advance(4);
+  const saveProgress = async (target: number) => {
+    if (!event || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await updateEvent(event.id, { wizardStep: Math.max(event.wizardStep || 1, target) });
+      setEvent(current => current ? { ...current, wizardStep: Math.max(current.wizardStep || 1, target) } : current);
+      advance(target);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your progress.");
+    } finally { setSaving(false); }
   };
+
+  const finishFields = () => { void saveProgress(4); };
 
   const publish = async () => {
     if (!event || saving || uploadingBanner) return;
@@ -763,7 +780,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               <EventStatusBadge event={{ ...event, status: details.status }} />
               {event.slug && (
                 <div className="hint" style={{ marginTop: 8, fontSize: 11 }}>
-                  Step {step} of 4
+                  Step {step} of 5
                 </div>
               )}
             </div>
@@ -780,7 +797,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
           <form onSubmit={submitInfo} noValidate className="wizard-form">
             <div className="field"><label htmlFor="registration-deadline">Registration closure date and time (your local time)</label><input id="registration-deadline" type="datetime-local" value={info.registrationDeadline} onChange={e => setInfo({ ...info, registrationDeadline: e.target.value })} /><p className="hint">Leave empty for no deadline. Applies to free and paid events.</p></div>
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 1 of 4</div>
+              <div className="wizard-step-badge-pill">Step 1 of 5</div>
               <h3>Event Details &amp; Pricing</h3>
               <p className="hint">Set your event format, pricing model, venue, schedule, and basic info.</p>
             </div>
@@ -1062,7 +1079,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         {step === 2 && event ? (
           <form onSubmit={submitDetails} noValidate className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 2 of 4</div>
+              <div className="wizard-step-badge-pill">Step 2 of 5</div>
               <h3>Agenda, Details &amp; Media</h3>
               <p className="hint">Set publication status, agenda, visibility, and upload your event cover &amp; banner images.</p>
             </div>
@@ -1217,7 +1234,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         {step === 3 && event ? (
           <div className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 3 of 4</div>
+              <div className="wizard-step-badge-pill">Step 3 of 5</div>
               <h3>Registration Form Fields</h3>
               <p className="hint">
                 Customize the attendee questions. Name and Email are always collected automatically.
@@ -1615,7 +1632,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 <FontAwesomeIcon icon={faArrowLeft} /> Back
               </button>
               <button className="btn btn-accent" type="button" onClick={finishFields}>
-                Continue to Review <FontAwesomeIcon icon={faArrowRight} />
+                Continue to Shared Access <FontAwesomeIcon icon={faArrowRight} />
               </button>
             </div>
 
@@ -1726,10 +1743,27 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
         {/* ── Step 4: Review & Publish ─────────────────────────── */}
         {step === 4 && event ? (
+          <div className="wizard-form shared-access-step">
+            <div className="wizard-form-header">
+              <div className="wizard-step-badge-pill">Step 4 of 5</div>
+              <h3>Shared Access</h3>
+              <p className="hint">Choose who can help manage this event and set their permissions. You can continue without sharing.</p>
+            </div>
+            {event.isOwner !== false ? (
+              <SharedMembersPanel eventId={event.id} isFree={info.eventType === "free" || info.price <= 0} onToast={onToast} />
+            ) : <p className="hint">Only the event owner or super admin can manage shared access.</p>}
+            <div className="wizard-foot">
+              <button className="btn btn-ghost" type="button" onClick={() => goToStep(3)}><FontAwesomeIcon icon={faArrowLeft} /> Back</button>
+              <button className="btn btn-accent" type="button" disabled={saving} onClick={() => void saveProgress(5)}>Continue to Event Summary <FontAwesomeIcon icon={faArrowRight} /></button>
+            </div>
+          </div>
+        ) : null}
+
+        {step === 5 && event ? (
           <div className="wizard-form">
             <div className="wizard-form-header">
-              <div className="wizard-step-badge-pill">Step 4 of 4</div>
-              <h3>Review &amp; Publish</h3>
+              <div className="wizard-step-badge-pill">Step 5 of 5</div>
+              <h3>Event Summary</h3>
               <p className="hint">Review your complete event configuration before publishing to attendees.</p>
             </div>
 
@@ -1811,10 +1845,9 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
             <EventDashboardSummary eventId={event.id} />
 
-            {event.isOwner !== false && <SharedMembersPanel eventId={event.id} isFree={info.eventType === "free" || info.price <= 0} onToast={onToast} />}
 
             <div className="wizard-foot">
-              <button className="btn btn-ghost" type="button" onClick={() => goToStep(3)}>
+              <button className="btn btn-ghost" type="button" onClick={() => goToStep(4)}>
                 <FontAwesomeIcon icon={faArrowLeft} /> Back
               </button>
               <div className="btn-row">

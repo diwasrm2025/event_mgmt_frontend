@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -49,17 +50,17 @@ export default function SignInPage() {
       <form onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" autoFocus />
+          <input id="email" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" autoFocus />
         </div>
         <div className="field">
           <label htmlFor="password">Password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
+            placeholder="Enter your password"
           />
         </div>
 

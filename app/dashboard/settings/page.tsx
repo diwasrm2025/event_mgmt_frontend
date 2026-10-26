@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
@@ -11,8 +12,6 @@ import {
   faCamera,
   faCheck,
   faSpinner,
-  faEye,
-  faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { getSession, refreshSession, initials, type SessionUser } from "@/lib/auth";
@@ -216,8 +215,6 @@ function SecurityTab({ onSave }: { onSave: () => void }) {
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
 
   const strength = (pwd: string) => {
     let score = 0;
@@ -259,35 +256,23 @@ function SecurityTab({ onSave }: { onSave: () => void }) {
       <form onSubmit={handleSubmit} noValidate className="settings-form">
         <div className="field">
           <label htmlFor="s-cur-pwd">Current password</label>
-          <div className="input-row">
-            <input
-              id="s-cur-pwd"
-              type={showCurrent ? "text" : "password"}
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-            />
-            <button type="button" className="toggle-pass" onClick={() => setShowCurrent((v) => !v)}>
-              <FontAwesomeIcon icon={showCurrent ? faEyeSlash : faEye} />
-            </button>
-          </div>
+          <PasswordInput
+            id="s-cur-pwd"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            autoComplete="current-password"
+            placeholder="Enter your current password"
+          />
         </div>
         <div className="field">
           <label htmlFor="s-new-pwd">New password</label>
-          <div className="input-row">
-            <input
-              id="s-new-pwd"
-              type={showNew ? "text" : "password"}
-              value={newPwd}
-              onChange={(e) => setNewPwd(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
-            />
-            <button type="button" className="toggle-pass" onClick={() => setShowNew((v) => !v)}>
-              <FontAwesomeIcon icon={showNew ? faEyeSlash : faEye} />
-            </button>
-          </div>
+          <PasswordInput
+            id="s-new-pwd"
+            value={newPwd}
+            onChange={(e) => setNewPwd(e.target.value)}
+            autoComplete="new-password"
+            placeholder="Create a new password (at least 8 characters)"
+          />
           {newPwd.length > 0 && (
             <div className="password-strength">
               <div className="strength-bars">
@@ -301,13 +286,12 @@ function SecurityTab({ onSave }: { onSave: () => void }) {
         </div>
         <div className="field">
           <label htmlFor="s-confirm-pwd">Confirm new password</label>
-          <input
+          <PasswordInput
             id="s-confirm-pwd"
-            type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            placeholder="••••••••"
             autoComplete="new-password"
+            placeholder="Re-enter your new password"
           />
           {confirm && newPwd !== confirm && <div className="hint" style={{ color: "var(--danger)" }}>Passwords do not match.</div>}
         </div>

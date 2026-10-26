@@ -300,10 +300,14 @@ export interface RestrictedBookingItem {
   checkedIn: boolean;
 }
 
-export type RosterAccess = { canApprovePayment: boolean; canCheckIn: boolean };
+export type RosterAccess = { canApprovePayment: boolean; canCheckIn: boolean; canDelete?: boolean };
 export type RosterBooking = Pick<BookingItem, "id" | "name" | "email" | "phone" | "seats" | "amount" | "createdAt" | "paymentMethod" | "paymentStatus" | "registrationStatus" | "status" | "responses"> & Partial<Pick<BookingItem, "paymentProof" | "transactionId" | "rejectionReason" | "paidAt" | "checkedIn" | "checkedInAt">>;
 export function getEventBookings(eventId: string) {
   return apiRequest<{ capabilities: RosterAccess; items: RosterBooking[] }>(`/bookings/event/${encodeURIComponent(eventId)}`);
+}
+
+export function deleteEventBooking(eventId: string, bookingId: string) {
+  return apiRequest<{ id: string }>(`/bookings/event/${encodeURIComponent(eventId)}/${encodeURIComponent(bookingId)}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------

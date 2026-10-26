@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -66,35 +67,35 @@ export default function SignUpPage() {
       <form onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="name">Full name</label>
-          <input id="name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" autoFocus />
+          <input id="name" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" autoFocus />
         </div>
         <div className="field">
           <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <input id="email" type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         </div>
         <div className="field-row">
           <div className="field">
             <label htmlFor="password">Password</label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
               autoComplete="new-password"
+              placeholder="Create a password (at least 8 characters)"
             />
           </div>
           <div className="field">
             <label htmlFor="confirm-password">Confirm password</label>
-            <input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
               autoComplete="new-password"
+              placeholder="Re-enter your password"
             />
           </div>
         </div>

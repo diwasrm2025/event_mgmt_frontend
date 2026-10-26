@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -69,14 +70,13 @@ export default function SuperAdminSignInPage() {
         </div>
         <div className="field">
           <label htmlFor="password">Super Admin Password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
-            placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
+            placeholder="Enter your password"
           />
         </div>
 

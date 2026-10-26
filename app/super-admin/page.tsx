@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
 import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyRow, CrudEmptyState } from "@/components/ui/CrudEmptyState";
@@ -610,7 +611,7 @@ function CreateUserModal({
           </div>
           <div className="field">
             <label htmlFor="user-password">Password</label>
-            <input id="user-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={8} maxLength={72} placeholder="Minimum 8 characters" />
+            <PasswordInput id="user-password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={8} maxLength={72} placeholder="Create a password (at least 8 characters)" />
           </div>
           <div className="field">
             <label htmlFor="user-role">Role</label>
