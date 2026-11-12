@@ -482,8 +482,8 @@ function UsersAndRolesTab({
                                 style={{ color: "var(--danger)" }}
                                 onClick={async () => {
                                   const res = await Swal.confirm(
-                                    "Are you sure want to delete",
-                                    `User "${user.name}" (${user.email}) will be permanently deleted.`,
+                                    "Delete this user and their events?",
+                                    `Deleting ${user.name} (${user.email}) will permanently delete their account, all events they created, and every registration and participant record for those events. Their bookings for events owned by other organizers will remain.`,
                                     "Delete"
                                   );
                                   if (!res.isConfirmed) return;

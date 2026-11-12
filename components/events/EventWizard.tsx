@@ -692,7 +692,10 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
 
   const handleDelete = async () => {
     if (!event) return;
-    const res = await Swal.confirm("Are you sure want to delete", `Event "${event.title}" will be permanently deleted.`);
+    const res = await Swal.confirm(
+      "Delete this event and its participants?",
+      `"${event.title}" and all registrations and participant records for this event will be permanently deleted. This cannot be undone.`,
+    );
     if (!res.isConfirmed) return;
     try {
       await removeEvent(event.id);

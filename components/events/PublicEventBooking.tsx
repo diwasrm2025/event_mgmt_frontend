@@ -5,6 +5,7 @@ import { registrationClosed, formatRegistrationDeadline, isDobField, pairDobAndA
 import { ShareEventLink } from "./ShareEventLink";
 import { EventBannerSlider } from "./EventBannerSlider";
 import { apiRequest } from "@/lib/api";
+import { QrPaymentFields } from "@/components/payments/QrPaymentFields";
 import { PaymentStatusActions } from "@/components/payments/PaymentStatusActions";
 import { PaymentNotice } from "@/components/payments/PaymentNotice";
 import { paymentStatusLink } from "@/lib/payment-status";
@@ -75,6 +76,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
   const [name, setName] = useState(session?.name ?? "");
   const [email, setEmail] = useState(session?.email ?? "");
   const [phone, setPhone] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+  const [paymentProof, setPaymentProof] = useState("");
+  const [qrReady, setQrReady] = useState(false);
 
   const [responses, setResponses] = useState<
     Record<string, string | boolean | string[]>
@@ -94,6 +98,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     message?: string;
     success?: boolean;
   } | null>(null);
+  const [statusLinkCopied, setStatusLinkCopied] = useState(false);
 
   /*
    * Load public event
@@ -293,24 +298,17 @@ export function PublicEventBooking({ slug }: { slug: string }) {
           ...(isFree
             ? {}
             : {
-                paymentMethod: "sbiepay" as const,
+                paymentMethod: "qr" as const,
+                transactionId: transactionId.trim(),
+                paymentProof,
               }),
         });
       const booking = result.booking;
       setReceipt(booking);
-      if (!isFree && result.transactionUrl) {
-        try {
-          const checkout = new URL(result.transactionUrl, window.location.origin);
-          if (!["http:", "https:"].includes(checkout.protocol)) throw new Error("Invalid checkout URL");
-          window.location.assign(checkout.href);
-          return;
-        } catch {
-          // Keep the saved order and its status link available if navigation fails.
-        }
-      }
       setStage("success");
 
       if (!isFree) {
+        setStatusLinkCopied(false);
         setNotice({
           title: "Payment verification pending",
           success: true,
@@ -333,6 +331,10 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
   async function handlePay(e: FormEvent) {
     e.preventDefault();
+    if (!qrReady || !paymentProof || !/^[A-Za-z0-9-]{6,100}$/.test(transactionId.trim())) {
+      setError("Complete payment, enter a valid transaction ID, and attach your screenshot.");
+      return;
+    }
     await placeBooking();
   }
 
@@ -567,38 +569,37 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     className="registration-form"
                     noValidate
                   >
-                    <h2>
-                      Pay with SBI ePay
-                    </h2>
-
-                    <p className="hint">You will be redirected to SBI ePay to complete payment securely.</p>
+                    <div className="payment-step-heading">
+                      <p className="chart-kicker">SECURE YOUR REGISTRATION</p>
+                      <h2>Review and pay</h2>
+                      <p className="hint">Pay the amount below, then enter your transaction reference and upload a screenshot so the organizer can verify it.</p>
+                    </div>
 
                     <div className="order-summary pro">
                       <div className="order-summary-row">
-                        <span>
-                          {event.title}
-                        </span>
-
-                        <strong>
-                          {formatCurrency(event.price)}
-                        </strong>
+                        <span>Event</span>
+                        <strong>{event.title}</strong>
                       </div>
 
                       <div className="order-summary-row">
                         <span>Attendee</span>
-
-                        <span>{name}</span>
+                        <strong>{name}</strong>
+                      </div>
+                      <div className="order-summary-row total">
+                        <span>Amount to pay</span>
+                        <strong className="amt">{formatCurrency(event.price)}</strong>
                       </div>
                     </div>
 
-                    <p className="hint">Your payment will be verified automatically using SBI Order Search before registration is confirmed.</p>
+                    <QrPaymentFields transactionId={transactionId} onTransactionId={setTransactionId} proof={paymentProof} onProof={setPaymentProof} onReady={setQrReady} />
+                    <p className="payment-review-note">After you submit, an administrator will review your payment. We'll email you when it's confirmed or if anything needs attention.</p>
 
                     <button
                       className="btn btn-vibrant"
                       type="submit"
                       disabled={submitting}
                     >
-                      Proceed to SBI ePay
+                      Submit payment for review
                     </button>
 
                     <button
@@ -636,7 +637,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     <strong>
                       {isFree
                         ? "Completing your registration..."
-                        : "Starting your SBI ePay payment..."}
+                        : "Submitting your payment screenshot..."}
                     </strong>
                   </div>
                 )}
@@ -667,25 +668,26 @@ export function PublicEventBooking({ slug }: { slug: string }) {
         <PaymentNotice
           title={notice.title}
           onClose={() => setNotice(null)}
+          closeDisabled={Boolean(notice.success && !statusLinkCopied)}
         >
           {notice.success && receipt ? (
             <>
               <p>
-                Your order has been saved, but SBI checkout could not be opened.
+                Your payment screenshot has been submitted for administrator review.
               </p>
 
               <p>
-                We will verify the order automatically. Save your status link and check your booking before starting another payment.
+                We will email the review result to {receipt.email}, including the reason if rejected.
               </p>
+
+              <p>Copy the private status link below to continue. Keep it safe so you can check your booking later.</p>
 
               <PaymentStatusActions
                 href={paymentStatusLink(receipt)}
+                onCopied={() => setStatusLinkCopied(true)}
+                focusOnOpen
+                hideViewUntilCopied
               />
-
-              <p className="hint">
-                Save this private link to check
-                your booking and payment status.
-              </p>
             </>
           ) : (
             <p>{notice.message}</p>
@@ -1074,7 +1076,7 @@ function SuccessReceipt({
             ? "Please contact the organizer about your payment."
             : paymentCompleted
               ? receipt.rejectionReason || "Payment is completed. Please contact the organizer about your registration."
-              : "SBI ePay verification is pending. Save your private status link below to track your payment."}
+              : "Payment is awaiting administrator review. We will email the outcome. Save your private status link below."}
       </p>
 
       {!isFree && <PaymentStatusActions href={paymentStatusLink(receipt)} />}

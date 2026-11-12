@@ -28,11 +28,27 @@ export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof
   }
   return <div className="qr-payment-fields">
     {showQr && <>
-    <p className="hint">Scan using your payment app and pay the registration amount shown below.</p>
-    {qrError ? <p role="alert" className="form-msg show error">The payment QR is currently unavailable. Please contact the organizer.</p> :
-      <img className="payment-qr-image" src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || paymentQr.src} alt="Scan to pay the event organizer" onLoad={() => onReady(true)} onError={() => { setQrError(true); onReady(false); }} />}
+    <section className="payment-qr-panel" aria-labelledby="payment-qr-heading">
+      <div className="payment-section-heading">
+        <span className="payment-step-number" aria-hidden="true">1</span>
+        <div>
+          <h3 id="payment-qr-heading">Pay using the QR code</h3>
+          <p>Open your payment app and scan this code to pay the amount shown above.</p>
+        </div>
+      </div>
+      {qrError ? <p role="alert" className="form-msg show error">The payment QR is currently unavailable. Please contact the organizer.</p> :
+        <img className="payment-qr-image" src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || paymentQr.src} alt="Payment QR code for the event organizer" onLoad={() => onReady(true)} onError={() => { setQrError(true); onReady(false); }} />}
+    </section>
     </>}
     {showEvidence && <>
+    <section className="payment-evidence-panel" aria-labelledby="payment-evidence-heading">
+      <div className="payment-section-heading">
+        <span className="payment-step-number" aria-hidden="true">{showQr ? "2" : "1"}</span>
+        <div>
+          <h3 id="payment-evidence-heading">Add your payment details</h3>
+          <p>Use the transaction reference from your payment receipt and attach a clear screenshot.</p>
+        </div>
+      </div>
     <label className="field">Transaction ID / UTR (required)
       <input required minLength={6} maxLength={100} pattern="[A-Za-z0-9-]{6,100}" value={transactionId} onChange={(e) => onTransactionId(e.target.value)} placeholder="Enter your payment transaction ID" />
     </label>
@@ -41,7 +57,8 @@ export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof
       <small>PNG, JPEG or WebP, maximum 5 MB.</small>
     </label>
     <FeedbackNotice message={error} icon="error" />
-    {proof && <img className="payment-proof-preview" src={proof} alt="Your selected payment screenshot" />}
+    {proof && <div className="payment-proof-preview-wrap"><p className="payment-proof-caption">Screenshot attached</p><img className="payment-proof-preview" src={proof} alt="Preview of your payment screenshot" /></div>}
+    </section>
     </>}
   </div>;
 }

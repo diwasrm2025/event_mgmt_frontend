@@ -25,12 +25,16 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
   }, [params.bookingId]);
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+  const approved = review?.paymentStatus === "paid" && review?.registrationStatus === "approved";
+  const rejected = review?.registrationStatus === "rejected" || review?.paymentStatus === "failed";
+  useEffect(() => {
+    if (approved || rejected) return;
     const timer = window.setInterval(() => void refresh(), 10000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
-  const paid = review?.paymentStatus === "paid";
+  }, [approved, rejected, refresh]);
   useEffect(() => {
-    if (!paid) {
+    if (!approved) {
       setCountdown(null);
       return;
     }
@@ -50,27 +54,32 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
       window.clearInterval(timer);
       if (redirectTimer !== undefined) window.clearTimeout(redirectTimer);
     };
-  }, [paid, router]);
-  const approved = review?.paymentStatus === "paid" && review?.registrationStatus === "approved";
-  const rejected = review?.registrationStatus === "rejected";
+  }, [approved, router]);
   return <><PublicTopBar /><main className="event-detail-shell">
     <section className="booking-card payment-status-card">
       <h1>Payment status</h1>
       <p className="hint">Bookmark this private link to check your payment review at any time.</p>
       <FeedbackNotice message={error} icon="error" />
-      <div aria-live="polite" className={review ? `payment-review-banner ${paid ? "is-completed" : rejected ? "is-rejected" : "is-pending"}` : undefined}>
+      <div aria-live="polite" className={review ? `payment-review-banner ${approved ? "is-completed" : rejected ? "is-rejected" : "is-pending"}` : undefined}>
         {!review && loading && <p>Checking your payment…</p>}
         {review && <>
-          <h2>{PAYMENT_STATUS_LABELS[review.paymentStatus]}</h2>
-          {paid && <p><strong>Your SBI ePay order has been confirmed.</strong></p>}
-          <p>{approved ? "Thank you for registering! SBI ePay has verified your payment. Your registration confirmation will be sent by email." : rejected ? "Your payment could not be approved. Please contact the event organizer to resolve the issue." : review?.paymentStatus === "paid" ? review.rejectionReason || "Payment received. Please contact the organizer to resolve your registration." : "Your SBI ePay order is awaiting verification. Registration will be confirmed only after SBI reports a successful order."}</p>
+          <h2>{rejected ? "Payment Rejected" : PAYMENT_STATUS_LABELS[review.paymentStatus]}</h2>
+          {approved && <p><strong>Your UPI payment has been confirmed.</strong></p>}
+          <p>{approved ? "Thank you for registering! Your UPI payment has been verified. Your registration confirmation will be sent by email." : rejected ? "Your payment was rejected. Please review the reason below or contact the event organizer." : review.paymentStatus === "paid" ? review.rejectionReason || "Payment received. Please contact the organizer to resolve your registration." : "Your UPI payment is awaiting verification. Registration will be confirmed once the payment is verified."}</p>
           {rejected && <p><strong>Reason: </strong>{review.rejectionReason || "Please contact the organizer for further details."}</p>}
-          {paid && review.paidAt && <p className="hint">Completed on {new Date(review.paidAt).toLocaleString()}</p>}
-          {paid && countdown !== null && <p role="status" aria-live="polite"><strong>{countdown > 0 ? `Returning to the event home in ${countdown}…` : "Loading event home…"}</strong></p>}
+          {approved && review.paidAt && <p className="hint">Completed on {new Date(review.paidAt).toLocaleString()}</p>}
+          {approved && countdown !== null && <div className="payment-completion-timer" role="status" aria-live="polite">
+            <div>
+              <strong>Returning to the event home</strong>
+              <span>You will be redirected in</span>
+            </div>
+            <strong className="payment-completion-timer-number">{String(Math.max(countdown, 0)).padStart(2, "0")}</strong>
+          </div>}
         </>}
       </div>
-      {!paid && <button className="btn btn-vibrant" type="button" disabled={loading} onClick={() => void refresh()}>{loading ? "Checking…" : "Refresh status"}</button>}
-      {!paid && <p className="hint">Status updates automatically every 10 seconds.</p>}
+      {!approved && !rejected && <button className="btn btn-vibrant" type="button" disabled={loading} onClick={() => void refresh()}>{loading ? "Checking…" : "Refresh status"}</button>}
+      {!approved && !rejected && <p className="hint">Status updates automatically every 10 seconds.</p>}
     </section>
-  </main></>;
+  </main>
+  </>;
 }

@@ -223,7 +223,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   qr: "QR payment",
   offline: "Pay offline",
   free: "Free",
-  sbiepay: "SBI ePay",
+  sbiepay: "UPI Payment (₹)",
 };
 
 export type BookingPayload = {

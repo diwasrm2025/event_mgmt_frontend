@@ -108,7 +108,7 @@ export function BookingsView({ events }: BookingsViewProps) {
               <tr>
                 <th>Event</th>
                 <th>Date</th>
-                <th>Ownership / Access</th>
+                <th>Created By</th>
                 <th>Booked</th>
                 <th>Fill rate</th>
                 <th>Revenue</th>
@@ -150,13 +150,16 @@ export function BookingsView({ events }: BookingsViewProps) {
                       <td>
                         {event.isOwner !== false ? (
                           <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                            Own
+                            Owner
                           </span>
                         ) : (
                           <div>
                             <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
-                              Shared by {event.ownerName || event.host || "Organizer"}
+                              Shared
                             </span>
+                            <div className="event-sub" style={{ fontSize: 11, marginTop: 4 }}>
+                              Owner: {event.ownerName || event.host || "Organizer"}
+                            </div>
                             {event.sharedPermissions?.length ? (
                               <div className="event-sub" style={{ fontSize: 11, marginTop: 4 }}>
                                 Access: {event.sharedPermissions.join(", ")}

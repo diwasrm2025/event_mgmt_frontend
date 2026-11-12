@@ -123,7 +123,10 @@ export function EventsView({ onToast }: EventsViewProps) {
   };
 
   const handleDelete = async (event: EventItem) => {
-    const res = await Swal.confirm("Are you sure want to delete", `Event "${event.title}" will be permanently deleted.`);
+    const res = await Swal.confirm(
+      "Delete this event and its participants?",
+      `"${event.title}" and all registrations and participant records for this event will be permanently deleted. This cannot be undone.`,
+    );
     if (!res.isConfirmed) return;
     try {
       await removeEvent(event.id);
@@ -221,7 +224,7 @@ export function EventsView({ onToast }: EventsViewProps) {
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "var(--surface-soft)" }}>
-              {["Event", "Date & Time", "Venue", "Access", "Fill Rate", "Price", "Status", "Actions"].map((h) => (
+              {["Event", "Date & Time", "Venue", "Created By", "Fill Rate", "Price", "Status", "Actions"].map((h) => (
                 <th key={h} style={{
                   padding: "10px 14px",
                   fontSize: 11,
@@ -319,7 +322,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                       )}
                     </td>
 
-                    {/* Access */}
+                    {/* Creator and sharing status */}
                     <td style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
                       {isOwner ? (
                         <span style={{
@@ -337,6 +340,9 @@ export function EventsView({ onToast }: EventsViewProps) {
                             border: "1px solid rgba(245,158,11,0.25)", borderRadius: 999,
                             padding: "3px 9px", fontSize: 11, fontWeight: 700,
                           }}>Shared</span>
+                          <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 3 }}>
+                            Owner: {event.ownerName || event.host || "Organizer"}
+                          </div>
                           {event.sharedPermissions?.length ? (
                             <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 3 }}>
                               {event.sharedPermissions.join(", ")}
