@@ -10,6 +10,7 @@ export async function exportParticipants(event: EventItem, bookings: RosterBooki
  { label: "Email Address", value: b => b.email },
  { label: "Phone Number", value: b => b.phone },
  { label: "Booking status", value: b => b.status },
+ { label: "Record type", value: b => b.isTest ? "TEST" : "LIVE" },
  { label: "Booking ID", value: b => b.id },
  ...fields.map(field => ({ label: field.label, value: (b: RosterBooking) => b.responses?.[field.name] })),
  { label: "Registration status", value: b => b.registrationStatus === "approved" && b.status === "confirmed" ? "Completed" : "Pending" },

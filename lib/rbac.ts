@@ -178,6 +178,7 @@ export type EventDashboardSummary = {
   owner: PersonSummary;
   sharedMembersCount: number;
   totalRegistrations: number;
+  testRegistrations: number;
   checkedInAttendees: number;
   pendingRegistrations: number;
   status: string;

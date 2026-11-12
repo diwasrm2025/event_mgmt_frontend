@@ -58,6 +58,13 @@ export function EventDashboardSummary({ eventId }: { eventId: string }) {
           <strong>{summary.totalRegistrations}</strong>
         </div>
       </div>
+      {summary.testRegistrations > 0 && <div className="event-dashboard-stat">
+        <FontAwesomeIcon icon={faClipboardList} />
+        <div>
+          <span className="hint">Test registrations</span>
+          <strong>{summary.testRegistrations}</strong>
+        </div>
+      </div>}
       {summary.checkedInAttendees !== undefined && <div className="event-dashboard-stat">
         <FontAwesomeIcon icon={faCircleCheck} />
         <div>

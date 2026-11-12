@@ -38,9 +38,11 @@ import {
   CATEGORY_COLORS,
   PAYMENT_STATUS_LABELS,
   createBooking,
+  createTestingBooking,
   formatCurrency,
   formatDateLabel,
   getPublicEvent,
+  getTestingEvent,
   type BookingItem,
   type EventFormFieldItem,
   type EventItem,
@@ -65,8 +67,9 @@ const timeLabel = (value: string) => {
   return `${h}:${m[2]} ${p}`;
 };
 
-export function PublicEventBooking({ slug }: { slug: string }) {
+export function PublicEventBooking({ slug, previewToken }: { slug: string; previewToken?: string }) {
   const session = useMemo(() => getSession(), []);
+  const isTesting = Boolean(previewToken);
 
   const [event, setEvent] = useState<EventItem | null | undefined>();
 
@@ -110,9 +113,13 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     setReceipt(null);
     setResponses({});
     setError("");
-    void getPublicEvent(slug).then((loaded) => { if (active) setEvent(loaded); });
+    setPaymentProof("");
+    setTransactionId("");
+    setQrReady(Boolean(previewToken));
+    const loadEvent = previewToken ? getTestingEvent(slug, previewToken) : getPublicEvent(slug);
+    void loadEvent.then((loaded) => { if (active) setEvent(loaded); });
     return () => { active = false; };
-  }, [slug]);
+  }, [slug, previewToken]);
 
   /*
    * Check payment/registration status
@@ -197,7 +204,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
         <main className="event-detail-shell">
           <div className="panel">
             <div className="panel-body empty-state">
-              This event could not be found.
+              {isTesting
+                ? "This testing preview is unavailable. Sign in with an authorized admin account and use the latest preview link."
+                : "This event could not be found."}
             </div>
           </div>
         </main>
@@ -205,7 +214,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     );
   }
 
-  if (registrationClosed(event) || event.status === "completed") return <><PublicTopBar /><main className="event-closed-page"><section className="event-closed-banner" aria-labelledby="registration-closed-title"><div className="closed-status-icon"><FontAwesomeIcon icon={faClock} /></div><span className="closed-eyebrow">REGISTRATION CLOSED</span><h1 id="registration-closed-title">Registration for this event has closed.</h1><p>The registration period has ended. New registrations are no longer available.</p>{event.registrationDeadline && <p className="closed-deadline">Last date of registration: <strong>{formatRegistrationDeadline(event.registrationDeadline)}</strong></p>}<Link href="/events" className="btn btn-accent">Explore other events</Link></section></main></>;
+  if (!isTesting && (registrationClosed(event) || event.status === "completed")) return <><PublicTopBar /><main className="event-closed-page"><section className="event-closed-banner" aria-labelledby="registration-closed-title"><div className="closed-status-icon"><FontAwesomeIcon icon={faClock} /></div><span className="closed-eyebrow">REGISTRATION CLOSED</span><h1 id="registration-closed-title">Registration for this event has closed.</h1><p>The registration period has ended. New registrations are no longer available.</p>{event.registrationDeadline && <p className="closed-deadline">Last date of registration: <strong>{formatRegistrationDeadline(event.registrationDeadline)}</strong></p>}<Link href="/events" className="btn btn-accent">Explore other events</Link></section></main></>;
 
 
   const bookedEvent = event;
@@ -219,11 +228,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
   const isFree = event.eventType === "free";
 
-  const soldOut =
+  const soldOut = !isTesting && (
     event.status === "sold-out" ||
-    (event.capacity > 0 && seatsLeft === 0);
+    (event.capacity > 0 && seatsLeft === 0));
 
-  const closed = event.status !== "published" && event.status !== "sold-out";
+  const closed = !isTesting && event.status !== "published" && event.status !== "sold-out";
 
   /*
    * Update dynamic registration field
@@ -290,7 +299,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
     setStage("processing");
 
     try {
-      const result = await createBooking(slug, {
+      const payload = {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim() || undefined,
@@ -302,7 +311,10 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                 transactionId: transactionId.trim(),
                 paymentProof,
               }),
-        });
+        };
+      const result = previewToken
+        ? await createTestingBooking(slug, previewToken, payload)
+        : await createBooking(slug, payload);
       const booking = result.booking;
       setReceipt(booking);
       setStage("success");
@@ -310,7 +322,7 @@ export function PublicEventBooking({ slug }: { slug: string }) {
       if (!isFree) {
         setStatusLinkCopied(false);
         setNotice({
-          title: "Payment verification pending",
+          title: isTesting ? "Test payment submitted for review" : "Payment verification pending",
           success: true,
         });
       }
@@ -408,9 +420,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
 
               <Detail
                 icon={faUserGroup}
-                label="Seats left"
+                label={isTesting ? "Testing capacity" : "Seats left"}
                 value={
-                  event.capacity
+                  isTesting
+                    ? "Not limited"
+                    : event.capacity
                     ? String(seatsLeft)
                     : "Unlimited"
                 }
@@ -444,6 +458,9 @@ export function PublicEventBooking({ slug }: { slug: string }) {
           ========================== */}
 
           <section id="event-registration" className="booking-card booking-form-card">
+            {isTesting && <div className="payment-review-banner is-pending" role="note">
+              Admin testing mode: no real payments are made, and test registrations do not affect live attendance or send emails.
+            </div>}
             {closed || soldOut ? (
               <div className="sold-out-banner">
                 {closed
@@ -570,9 +587,11 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                     noValidate
                   >
                     <div className="payment-step-heading">
-                      <p className="chart-kicker">SECURE YOUR REGISTRATION</p>
-                      <h2>Review and pay</h2>
-                      <p className="hint">Pay the amount below, then enter your transaction reference and upload a screenshot so the organizer can verify it.</p>
+                      <p className="chart-kicker">{isTesting ? "ADMIN TEST MODE" : "SECURE YOUR REGISTRATION"}</p>
+                      <h2>{isTesting ? "Test the payment review" : "Review and pay"}</h2>
+                      <p className="hint">{isTesting
+                        ? "Do not make a real payment. Use sample transaction details and an image to test the administrator review flow."
+                        : "Pay the amount below, then enter your transaction reference and upload a screenshot so the organizer can verify it."}</p>
                     </div>
 
                     <div className="order-summary pro">
@@ -591,8 +610,10 @@ export function PublicEventBooking({ slug }: { slug: string }) {
                       </div>
                     </div>
 
-                    <QrPaymentFields transactionId={transactionId} onTransactionId={setTransactionId} proof={paymentProof} onProof={setPaymentProof} onReady={setQrReady} />
-                    <p className="payment-review-note">After you submit, an administrator will review your payment. We'll email you when it's confirmed or if anything needs attention.</p>
+                    <QrPaymentFields transactionId={transactionId} onTransactionId={setTransactionId} proof={paymentProof} onProof={setPaymentProof} onReady={setQrReady} showQr={!isTesting} />
+                    <p className="payment-review-note">{isTesting
+                      ? "This test submission is isolated from live attendance, payment processing, and email notifications."
+                      : "After you submit, an administrator will review your payment. We'll email you when it's confirmed or if anything needs attention."}</p>
 
                     <button
                       className="btn btn-vibrant"
@@ -1049,6 +1070,7 @@ function SuccessReceipt({
   receipt: BookingItem;
 }) {
   const isFree = event.eventType === "free";
+  const isTest = Boolean(receipt.isTest);
   const paymentCompleted = receipt.paymentStatus === "paid";
   const isPaid = paymentCompleted && receipt.registrationStatus === "approved";
 
@@ -1068,7 +1090,11 @@ function SuccessReceipt({
       </div>
 
       <p className="event-sub">
-        {isFree
+        {isTest
+          ? isFree
+            ? "This test registration was recorded. No email was sent and it does not affect live attendance."
+            : "This is a test payment submission. No real payment was processed or email sent; it does not affect live attendance."
+          : isFree
           ? "Your free registration is confirmed! A confirmation email with your ticket details has been sent to your email address."
           : isPaid
           ? "Thank you for registering. A confirmation email with your ticket has been sent to your email address."

@@ -34,6 +34,7 @@ import {
   formatCurrency,
   formatDateLabel,
   getAdminEventLink,
+  getEventLink,
   getEventLinkAbsolute,
   removeEvent,
   parseEventDate,
@@ -139,9 +140,21 @@ export function EventsView({ onToast }: EventsViewProps) {
 
   const handlePublish = async (event: EventItem) => {
     try {
-      await finalizeEvent(event.id, "published");
+      const publishedEvent = await finalizeEvent(event.id, "published");
       await loadEvents();
-      onToast(`"${event.title}" is now published.`);
+      const result = await Swal.fire({
+        title: "Event published",
+        text: `"${publishedEvent.title}" is now live and ready for registrations.`,
+        icon: "success",
+        showCancelButton: true,
+        confirmButtonText: "View Event",
+        cancelButtonText: "Close",
+      });
+      if (result.isConfirmed) {
+        const eventUrl = getEventLink(publishedEvent);
+        if (eventUrl) router.push(eventUrl);
+        else onToast("The event was published, but its public link is not available yet.");
+      }
     } catch (err) {
       onToast(err instanceof Error ? err.message : "Could not publish this event — check the wizard for missing fields.");
     }
@@ -153,7 +166,7 @@ export function EventsView({ onToast }: EventsViewProps) {
       onToast("Finish the wizard to generate this event's booking link.");
       return;
     }
-    try { await navigator.clipboard.writeText(url); onToast("Booking link copied."); }
+    try { await navigator.clipboard.writeText(url); onToast(event.status === "testing" ? "Testing preview link copied." : "Booking link copied."); }
     catch { onToast("Could not copy the link. Open the booking page and copy its address."); }
   };
 
@@ -202,6 +215,7 @@ export function EventsView({ onToast }: EventsViewProps) {
             <option value="">All statuses</option>
             <option value="published">Published</option>
             <option value="draft">Draft</option>
+            <option value="testing">Testing</option>
             <option value="sold-out">Sold Out</option>
             <option value="completed">Completed</option>
           </select>
@@ -257,6 +271,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                 const color = CATEGORY_COLORS[event.category] || "#999";
                 const fillRate = event.capacity > 0 ? Math.round((event.attendees / event.capacity) * 100) : 0;
                 const isOwner = event.isOwner !== false;
+                const shareUrl = getEventLinkAbsolute(event);
 
                 return (
                   <tr key={event.id} style={{
@@ -382,7 +397,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                     {/* Actions */}
                     <td style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", textAlign: "right" }}>
                       <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", flexWrap: "nowrap" }}>
-                        {event.status === "draft" && canEdit(event) ? (
+                        {(event.status === "draft" || event.status === "testing") && canEdit(event) ? (
                           <button className="icon-btn has-tooltip" data-tooltip="Publish event"
                             onClick={() => handlePublish(event)} aria-label="Publish event"
                             style={{ color: "var(--success)" }}>
@@ -395,10 +410,10 @@ export function EventsView({ onToast }: EventsViewProps) {
                             <FontAwesomeIcon icon={faShareNodes} />
                           </button>
                         )}
-                        {event.slug && <button className="icon-btn has-tooltip" data-tooltip="Download event QR code" aria-label="Download event QR code" disabled={qrDownloading === event.id} onClick={() => void downloadEventQr(event)}><FontAwesomeIcon icon={faDownload} /></button>}
-                        {event.slug && (
-                          <button className="icon-btn has-tooltip" data-tooltip="Copy booking link"
-                            onClick={() => copyLink(event)} aria-label="Copy booking link">
+                        {shareUrl && event.status !== "testing" && <button className="icon-btn has-tooltip" data-tooltip="Download event QR code" aria-label="Download event QR code" disabled={qrDownloading === event.id} onClick={() => void downloadEventQr(event)}><FontAwesomeIcon icon={faDownload} /></button>}
+                        {shareUrl && (
+                          <button className="icon-btn has-tooltip" data-tooltip={event.status === "testing" ? "Copy testing preview link" : "Copy booking link"}
+                            onClick={() => copyLink(event)} aria-label={event.status === "testing" ? "Copy testing preview link" : "Copy booking link"}>
                             <FontAwesomeIcon icon={faLink} />
                           </button>
                         )}

@@ -2,7 +2,7 @@
 
 import { apiRequest, apiUpload } from "./api";
 
-export type EventStatus = "published" | "draft" | "sold-out" | "completed";
+export type EventStatus = "published" | "draft" | "testing" | "sold-out" | "completed";
 export type EventCategory = string;
 export type EventMode = "online" | "offline";
 export type EventType = "free" | "paid";
@@ -22,6 +22,7 @@ export interface EventItem {
   id: string;
   /** Null until the admin completes the final wizard step. */
   slug: string | null;
+  previewToken?: string | null;
   registrationDeadline?: string | null;
   registrationClosed?: boolean;
   title: string;
@@ -201,6 +202,14 @@ export async function getPublicEvent(slug: string): Promise<EventItem | null> {
   }
 }
 
+export async function getTestingEvent(slug: string, token: string): Promise<EventItem | null> {
+  try {
+    return await apiRequest<EventItem>(`/public/testing/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, { auth: true });
+  } catch {
+    return null;
+  }
+}
+
 export async function listPublicEvents(filters: { search?: string; category?: string } = {}): Promise<EventItem[]> {
   return apiRequest<EventItem[]>("/public/events", {
     query: { search: filters.search, category: filters.category },
@@ -258,6 +267,7 @@ export interface BookingItem {
   paymentAccessToken: string;
   rejectionReason: string | null;
   paidAt: string | null;
+  isTest?: boolean;
 }
 
 /** Submit registration and payment evidence for administrator review. */
@@ -282,6 +292,18 @@ export async function createBooking(
   return "booking" in result ? result : { booking: result };
 }
 
+export async function createTestingBooking(
+  slug: string,
+  token: string,
+  data: BookingPayload
+): Promise<CreateBookingResponse> {
+  const result = await apiRequest<CreateBookingResponse | BookingItem>(
+    `/public/testing/${encodeURIComponent(slug)}/${encodeURIComponent(token)}/bookings`,
+    { method: "POST", body: data, auth: true }
+  );
+  return "booking" in result ? result : { booking: result };
+}
+
 export async function getMyBookings(): Promise<BookingItem[]> {
   return apiRequest<BookingItem[]>("/bookings/me");
 }
@@ -301,9 +323,13 @@ export interface RestrictedBookingItem {
 }
 
 export type RosterAccess = { canApprovePayment: boolean; canCheckIn: boolean; canDelete?: boolean };
-export type RosterBooking = Pick<BookingItem, "id" | "name" | "email" | "phone" | "seats" | "amount" | "createdAt" | "paymentMethod" | "paymentStatus" | "registrationStatus" | "status" | "responses"> & Partial<Pick<BookingItem, "paymentProof" | "transactionId" | "rejectionReason" | "paidAt" | "checkedIn" | "checkedInAt">>;
+export type RosterBooking = Pick<BookingItem, "id" | "name" | "email" | "phone" | "seats" | "amount" | "createdAt" | "paymentMethod" | "paymentStatus" | "registrationStatus" | "status" | "responses" | "isTest"> & Partial<Pick<BookingItem, "paymentProof" | "transactionId" | "rejectionReason" | "paidAt" | "checkedIn" | "checkedInAt">> & { hasPaymentProof?: boolean };
 export function getEventBookings(eventId: string) {
   return apiRequest<{ capabilities: RosterAccess; items: RosterBooking[] }>(`/bookings/event/${encodeURIComponent(eventId)}`);
+}
+
+export function getEventPaymentProof(eventId: string, bookingId: string) {
+  return apiRequest<Blob>(`/bookings/event/${encodeURIComponent(eventId)}/${encodeURIComponent(bookingId)}/payment-proof`, { responseType: "blob" });
 }
 
 export function deleteEventBooking(eventId: string, bookingId: string) {
@@ -370,7 +396,7 @@ export function getAnalyticsData(events: EventItem[]) {
     .map(([label, value]) => ({ label, value, color: CATEGORY_COLORS[label as EventCategory] || "#999999" }))
     .sort((a, b) => b.value - a.value);
 
-  const byStatus = ["published", "draft", "sold-out", "completed"].map((status) => ({
+  const byStatus = ["published", "draft", "testing", "sold-out", "completed"].map((status) => ({
     label: status,
     value: events.filter((event) => event.status === status).length,
   }));
@@ -415,7 +441,11 @@ export function getAdminEventLink(event: EventItem) {
 
 /** Public booking URL — null until the wizard's final step generates a slug. */
 export function getEventLink(event: EventItem) {
-  return event.slug ? `/events/${event.slug}` : null;
+  if (!event.slug) return null;
+  if (event.status === "testing") {
+    return event.previewToken ? `/testing/${encodeURIComponent(event.slug)}/${encodeURIComponent(event.previewToken)}` : null;
+  }
+  return `/events/${encodeURIComponent(event.slug)}`;
 }
 
 export function getEventLinkAbsolute(event: EventItem) {

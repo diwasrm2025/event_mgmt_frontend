@@ -670,7 +670,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     try {
       const finalized = await finalizeEvent(event.id, details.status);
       setEvent(finalized);
-      onToast(finalized.status === "draft" ? "Draft saved. Publish it to accept bookings." : "Event saved with a booking link.");
+      onToast(finalized.status === "draft" ? "Draft saved. Publish it to accept bookings." : finalized.status === "testing" ? "Testing preview link generated for authorized admins." : "Event saved with a booking link.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not publish this event.");
     } finally {
@@ -1100,9 +1100,11 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   onChange={(e) => setDetails({ ...details, status: e.target.value as EventStatus })}
                 >
                   <option value="draft">📝 Draft — not visible to the public</option>
+                  <option value="testing">🧪 Testing — private admin preview, no live bookings or emails</option>
                   <option value="published">✅ Published — open for registrations</option>
                   <option value="sold-out">🔴 Sold Out — no more seats available</option>
                 </select>
+                <small className="hint">Testing links require an authorized admin account. Test bookings are isolated and never send emails or change live attendee totals.</small>
               </div>
             </div>
 
@@ -1816,20 +1818,20 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               </div>
             </div>
 
-            {event.slug ? (
+            {event.slug && getEventLinkAbsolute(event) ? (
               <div className="wizard-section">
                 <div className="wizard-section-title">
-                  <FontAwesomeIcon icon={faGlobe} /> Public Booking Link &amp; Download QR
+                  <FontAwesomeIcon icon={faGlobe} /> {event.status === "testing" ? "Private Testing Preview Link" : "Public Booking Link &amp; Download QR"}
                 </div>
                 <div className="share-url-box">
                   <span style={{ flex: 1, wordBreak: "break-all" }}>{getEventLinkAbsolute(event)}</span>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => void downloadQr(event.title, getEventLinkAbsolute(event)!).catch(() => onToast("Could not download QR code."))}>Download QR Code</button>
+                  {event.status !== "testing" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void downloadQr(event.title, getEventLinkAbsolute(event)!).catch(() => onToast("Could not download QR code."))}>Download QR Code</button>}
                   <button type="button" className="icon-btn" onClick={copyShareLink} aria-label="Copy link">
                     <FontAwesomeIcon icon={faCopy} />
                   </button>
                 </div>
                 <div className="hint" style={{ marginTop: 6 }}>
-                  Share this link with attendees. Free registrations require no payment.
+                  {event.status === "testing" ? "This token-protected link is for authorized admins to test the registration workflow. Test submissions do not affect live attendance or send emails." : "Share this link with attendees. Free registrations require no payment."}
                 </div>
                 <button
                   type="button"
@@ -1840,9 +1842,13 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   <FontAwesomeIcon icon={faUsers} /> View attendees ({event.attendees})
                 </button>
               </div>
+            ) : event.slug && event.status === "testing" ? (
+              <div className="hint" style={{ margin: "12px 0" }}>
+                Save the testing status to generate the token-protected preview link.
+              </div>
             ) : (
               <div className="hint" style={{ margin: "12px 0" }}>
-                Publishing generates a live booking URL for attendees to register.
+                {details.status === "testing" ? "Save the testing status to generate a private admin preview link." : "Publishing generates a live booking URL for attendees to register."}
               </div>
             )}
 
@@ -1862,7 +1868,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                 </button>
                 <button className="btn btn-accent" type="button" onClick={publish} disabled={saving || uploadingBanner}>
                   {saving ? <FontAwesomeIcon icon={faSpinner} spin /> : null}{" "}
-                  {event.slug ? "Save changes" : details.status === "draft" ? "Save draft & generate link" : "Publish & generate link"}
+                  {details.status === "testing" && !event.previewToken ? "Generate testing preview" : event.slug ? "Save changes" : details.status === "draft" ? "Save draft" : "Publish & generate link"}
                 </button>
               </div>
             </div>

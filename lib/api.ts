@@ -66,6 +66,7 @@ type RequestOptions = {
   formData?: FormData;
   query?: Record<string, string | undefined | null>;
   auth?: boolean;
+  responseType?: "blob";
 };
 
 function buildQuery(query?: RequestOptions["query"]) {
@@ -141,7 +142,9 @@ async function sendRequest<T>(path: string, options: RequestOptions = {}): Promi
   }
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await response.json().catch(() => null) : null;
+  const payload = response.ok && options.responseType === "blob"
+    ? await response.blob()
+    : isJson ? await response.json().catch(() => null) : null;
 
   if (!response.ok) {
     if (response.status === 401 && typeof window !== "undefined") {

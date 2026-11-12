@@ -83,6 +83,7 @@ export function BookingsView({ events }: BookingsViewProps) {
               <option value="">All statuses</option>
               <option value="published">Published</option>
               <option value="draft">Draft</option>
+              <option value="testing">Testing</option>
               <option value="sold-out">Sold out</option>
             </select>
             {filtersActive ? (

@@ -34,7 +34,7 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
     return () => window.clearInterval(timer);
   }, [approved, rejected, refresh]);
   useEffect(() => {
-    if (!approved) {
+    if (!approved || review?.isTest) {
       setCountdown(null);
       return;
     }
@@ -54,7 +54,7 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
       window.clearInterval(timer);
       if (redirectTimer !== undefined) window.clearTimeout(redirectTimer);
     };
-  }, [approved, router]);
+  }, [approved, review?.isTest, router]);
   return <><PublicTopBar /><main className="event-detail-shell">
     <section className="booking-card payment-status-card">
       <h1>Payment status</h1>
@@ -65,10 +65,10 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
         {review && <>
           <h2>{rejected ? "Payment Rejected" : PAYMENT_STATUS_LABELS[review.paymentStatus]}</h2>
           {approved && <p><strong>Your UPI payment has been confirmed.</strong></p>}
-          <p>{approved ? "Thank you for registering! Your UPI payment has been verified. Your registration confirmation will be sent by email." : rejected ? "Your payment was rejected. Please review the reason below or contact the event organizer." : review.paymentStatus === "paid" ? review.rejectionReason || "Payment received. Please contact the organizer to resolve your registration." : "Your UPI payment is awaiting verification. Registration will be confirmed once the payment is verified."}</p>
+          <p>{review.isTest ? "This test registration is isolated from live attendance and no email was sent." : approved ? "Thank you for registering! Your UPI payment has been verified. Your registration confirmation will be sent by email." : rejected ? "Your payment was rejected. Please review the reason below or contact the event organizer." : review.paymentStatus === "paid" ? review.rejectionReason || "Payment received. Please contact the organizer to resolve your registration." : "Your UPI payment is awaiting verification. Registration will be confirmed once the payment is verified."}</p>
           {rejected && <p><strong>Reason: </strong>{review.rejectionReason || "Please contact the organizer for further details."}</p>}
           {approved && review.paidAt && <p className="hint">Completed on {new Date(review.paidAt).toLocaleString()}</p>}
-          {approved && countdown !== null && <div className="payment-completion-timer" role="status" aria-live="polite">
+          {approved && !review.isTest && countdown !== null && <div className="payment-completion-timer" role="status" aria-live="polite">
             <div>
               <strong>Returning to the event home</strong>
               <span>You will be redirected in</span>

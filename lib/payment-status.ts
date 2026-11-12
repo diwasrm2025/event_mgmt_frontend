@@ -1,7 +1,7 @@
 import { apiRequest } from "./api";
 import type { BookingItem } from "./events";
 
-export type PaymentReview = Pick<BookingItem, "paymentStatus" | "registrationStatus" | "paidAt" | "status" | "rejectionReason">;
+export type PaymentReview = Pick<BookingItem, "paymentStatus" | "registrationStatus" | "paidAt" | "status" | "rejectionReason" | "isTest">;
 
 export function paymentStatusLink(booking: Pick<BookingItem, "id" | "paymentAccessToken">) {
   return `/payment-status/${encodeURIComponent(booking.id)}#token=${encodeURIComponent(booking.paymentAccessToken)}`;
