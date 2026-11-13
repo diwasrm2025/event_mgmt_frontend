@@ -136,7 +136,7 @@ function ProfileTab({ user, onSave }: { user: SessionUser; onSave: (u: SessionUs
     }
   };
 
-  const displayAvatar = avatarUrl ? `${AVATAR_BASE}${avatarUrl}` : null;
+  const displayAvatar = avatarUrl ? (/^https?:\/\//i.test(avatarUrl) ? avatarUrl : `${AVATAR_BASE}${avatarUrl}`) : null;
 
   return (
     <div className="settings-section">
