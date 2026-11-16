@@ -416,10 +416,10 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
                     ? "Join online"
                     : event.venue || "TBA"
                 }
+                mapUrl={event.eventMode === "offline" ? event.googleMapsUrl : undefined}
               />
 
-              <Detail
-                icon={faUserGroup}
+                <Detail icon={faUserGroup}
                 label={isTesting ? "Testing capacity" : "Seats left"}
                 value={
                   isTesting
@@ -727,20 +727,29 @@ function Detail({
   icon,
   label,
   value,
+  mapUrl,
 }: {
   icon: IconDefinition;
   label: string;
   value: string;
+  mapUrl?: string;
 }) {
   return (
     <div className="detail-card">
-      <FontAwesomeIcon icon={icon} />
+      <FontAwesomeIcon icon={icon} /> {mapUrl?.trim() && /^https?:\/\//i.test(mapUrl.trim()) && (
+          <a href={mapUrl.trim()} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.8rem", textDecoration: "underline" }}>
+            View on Google Map
+          </a>
+        )}
 
       <div className="label">
-        {label}
+        {label} 
       </div>
 
-      <strong>{value}</strong>
+      <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "6px 12px" }}>
+        <strong>{value}</strong>
+        
+      </div>
     </div>
   );
 }

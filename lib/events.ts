@@ -32,6 +32,7 @@ export interface EventItem {
   eventMode: EventMode;
   onlineUrl: string;
   venue: string;
+  googleMapsUrl?: string;
   capacity: number;
   attendees: number;
   eventType: EventType;
@@ -83,6 +84,7 @@ export type EventPayload = Partial<{
   eventMode: EventMode;
   onlineUrl: string;
   venue: string;
+  googleMapsUrl?: string;
   capacity: number;
   attendees: number;
   eventType: EventType;

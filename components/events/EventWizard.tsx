@@ -153,6 +153,7 @@ type InfoForm = {
   eventMode: EventMode;
   onlineUrl: string;
   venue: string;
+  googleMapsUrl: string;
   host: string;
   capacity: number;
   eventType: EventType;
@@ -228,6 +229,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     eventMode: "offline",
     onlineUrl: "",
     venue: "",
+    googleMapsUrl: "",
     host: "",
     capacity: 100,
     eventType: "free",
@@ -266,6 +268,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       eventMode: loaded.eventMode,
       onlineUrl: loaded.onlineUrl,
       venue: loaded.venue,
+      googleMapsUrl: loaded.googleMapsUrl || "",
       host: loaded.host,
       capacity: loaded.capacity,
       eventType: evtType,
@@ -334,6 +337,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     if (!isValidDate(info.date)) errs.date = "Please select a valid event date.";
     if (info.eventMode === "online" && !isValidHttpUrl(info.onlineUrl)) errs.onlineUrl = "Enter a valid http or https meeting URL.";
     if (info.eventMode === "offline" && !info.venue.trim()) errs.venue = "Venue location is required.";
+    if (info.googleMapsUrl.trim() && !isValidHttpUrl(info.googleMapsUrl.trim())) errs.googleMapsUrl = "Enter a valid http or https Google Maps link.";
     if (!isValidCapacity(info.capacity)) errs.capacity = "Total seats must be a whole number between 1 and 2,147,483,647.";
     else if (info.capacity < (event?.attendees ?? 0)) errs.capacity = "Total seats cannot be fewer than booked seats.";
     if (info.eventType === "paid" && !isValidTicketPrice(info.price)) {
@@ -370,6 +374,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         eventMode: info.eventMode,
         onlineUrl: info.eventMode === "online" ? info.onlineUrl.trim() : "",
         venue: info.eventMode === "offline" ? info.venue.trim() : "",
+        googleMapsUrl: info.eventMode === "offline" ? info.googleMapsUrl.trim() : "",
         host: info.host.trim() || "Organizer",
         capacity: Number(info.capacity),
         eventType: info.eventType,
@@ -1003,6 +1008,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   <FieldErr name="onlineUrl" />
                 </div>
               ) : (
+                <>
                 <div className="field">
                   <label htmlFor="w-venue">
                     <FontAwesomeIcon icon={faMapPin} className="field-icon" /> Venue Location{" "}
@@ -1017,6 +1023,21 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                   />
                   <FieldErr name="venue" />
                 </div>
+                <div className="field">
+                  <label htmlFor="w-google-maps-url">
+                    <FontAwesomeIcon icon={faMapPin} className="field-icon" /> Address in Google Map (optional)
+                  </label>
+                  <input
+                    id="w-google-maps-url"
+                    type="url"
+                    value={info.googleMapsUrl}
+                    onChange={(e) => setInfo({ ...info, googleMapsUrl: e.target.value })}
+                    placeholder="https://maps.google.com/..."
+                    className={stepErrors.googleMapsUrl ? "input-error" : ""}
+                  />
+                  <FieldErr name="googleMapsUrl" />
+                </div>
+                </>
               )}
             </div>
 
