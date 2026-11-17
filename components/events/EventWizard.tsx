@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
 import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import Link from "next/link";
@@ -1159,7 +1160,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               <div className="banner-thumb-grid">
                 {(event.banners || []).map((url, idx) => (
                   <div key={url} className={`banner-thumb-item ${idx === 0 ? "banner-thumb-active" : ""}`}>
-                    <img src={bannerSrc(url)} alt={`Banner ${idx + 1}`} />
+                    <Image unoptimized width={320} height={180} src={bannerSrc(url)} alt={`Banner ${idx + 1}`} />
                     {idx === 0 ? (
                       <span className="banner-default-badge">⭐ Default</span>
                     ) : (

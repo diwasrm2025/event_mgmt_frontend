@@ -1,6 +1,6 @@
 "use client";
 
-import { isCompletedEvent } from "@/lib/event-lifecycle";
+import { isCompletedEvent, newestEventsFirst } from "@/lib/event-lifecycle";
 import { useEventClock } from "@/lib/use-event-clock";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -12,7 +12,6 @@ import {
   getAdminEventLink,
   getAnalyticsData,
   getStats,
-  parseEventDate,
   type ActivityItem,
   type EventItem,
 } from "@/lib/events";
@@ -81,7 +80,7 @@ export function DashboardView({ events, stats, activity, onToast }: DashboardVie
   const revenueMax = Math.max(...analytics.revenue, 1);
   const upcoming = [...events]
     .filter((event) => !isCompletedEvent(event, now))
-    .sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime())
+    .sort(newestEventsFirst)
     .slice(0, 5);
 
   return (

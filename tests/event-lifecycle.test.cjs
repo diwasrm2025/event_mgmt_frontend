@@ -17,3 +17,12 @@ test('current and completed tabs split at the event time, including today', () =
   assert.equal(isCompletedEvent({ ...event, date: '', time: '' }, now), false);
   assert.equal(isCompletedEvent({ ...event, date: '2027-01-01', status: 'completed' }, now), true);
 });
+
+test('events are ordered by creation time rather than scheduled date', () => {
+  const { newestEventsFirst } = loaded.exports;
+  const events = [
+    { id: 'older', createdAt: '2026-11-01T00:00:00Z', date: '2026-12-01' },
+    { id: 'latest', createdAt: '2026-11-17T00:00:00Z', date: '2027-01-01' },
+  ];
+  assert.deepEqual(events.sort(newestEventsFirst).map(e => e.id), ['latest', 'older']);
+});

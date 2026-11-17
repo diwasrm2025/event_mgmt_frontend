@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ProgressLoader } from "@/components/ui/ProgressLoader";
 
@@ -314,7 +315,7 @@ export function SharedMembersPanel({
                 {shareResults.map(person => {
                   const alreadyShared = (members ?? []).some(member => member.user.id === person.id && member.status === "ACTIVE");
                   return <button type="button" key={person.id} className={"share-search-row " + (selectedUser?.id === person.id ? "is-selected" : "")} disabled={sharing || alreadyShared || loading} aria-pressed={selectedUser?.id === person.id} onClick={() => setSelectedUser(person)}>
-                    <span className="member-avatar">{person.avatarUrl ? <img src={person.avatarUrl} alt="" /> : initialsOf(person.name)}</span>
+                    <span className="member-avatar">{person.avatarUrl ? <Image unoptimized width={44} height={44} src={person.avatarUrl} alt="" /> : initialsOf(person.name)}</span>
                     <span className="share-person-info"><strong>{person.name}</strong><span className="hint">{person.email}</span></span>
                     <span className="badge">{alreadyShared ? "Has access" : selectedUser?.id === person.id ? "Selected" : "Select"}</span>
                   </button>;
@@ -439,7 +440,7 @@ export function SharedMembersPanel({
             <div className="shared-member-row" key={member.id}>
               <div className="avatar-ring" style={{ width: 44, height: 44, flexShrink: 0 }}>
                 <div className="avatar-ring-inner">
-                  {member.user.avatarUrl ? <img src={member.user.avatarUrl} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%" }} /> : initialsOf(member.user.name)}
+                  {member.user.avatarUrl ? <Image unoptimized width={44} height={44} src={member.user.avatarUrl} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%" }} /> : initialsOf(member.user.name)}
                 </div>
               </div>
               <div className="member-main">

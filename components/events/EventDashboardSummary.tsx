@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -37,7 +38,7 @@ export function EventDashboardSummary({ eventId }: { eventId: string }) {
     <div className="event-dashboard-summary">
       <div className="event-dashboard-stat">
         <span className="member-avatar">
-          {summary.owner.avatarUrl ? <img src={summary.owner.avatarUrl} alt="" /> : initialsOf(summary.owner.name)}
+          {summary.owner.avatarUrl ? <Image unoptimized width={38} height={38} src={summary.owner.avatarUrl} alt="" /> : initialsOf(summary.owner.name)}
         </span>
         <div>
           <span className="hint">Owner</span>

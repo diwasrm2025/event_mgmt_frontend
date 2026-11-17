@@ -1,5 +1,5 @@
 "use client";
-import { isCompletedEvent } from "./event-lifecycle";
+import { isCompletedEvent, newestEventsFirst } from "./event-lifecycle";
 
 import { apiRequest, apiUpload } from "./api";
 
@@ -21,6 +21,7 @@ export interface EventFormFieldItem {
 
 export interface EventItem {
   id: string;
+  createdAt?: string;
   /** Null until the admin completes the final wizard step. */
   slug: string | null;
   previewToken?: string | null;
@@ -103,7 +104,7 @@ export async function allEvents(filters: EventFilters = {}): Promise<EventItem[]
   const events = await apiRequest<EventItem[]>("/events", {
     query: { search: filters.search, category: filters.category, status: filters.status },
   });
-  return [...events].sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime());
+  return [...events].sort(newestEventsFirst);
 }
 
 export async function getEvent(id: string): Promise<EventItem | null> {

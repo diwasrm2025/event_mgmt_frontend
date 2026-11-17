@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { FeedbackNotice } from "@/components/ui/FeedbackNotice";
 import paymentQr from "@/app/images/payment_qr.jpeg";
@@ -37,7 +38,7 @@ export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof
         </div>
       </div>
       {qrError ? <p role="alert" className="form-msg show error">The payment QR is currently unavailable. Please contact the organizer.</p> :
-        <img className="payment-qr-image" src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || paymentQr.src} alt="Payment QR code for the event organizer" onLoad={() => onReady(true)} onError={() => { setQrError(true); onReady(false); }} />}
+        <Image style={{ height: "auto" }} unoptimized width={320} height={320} className="payment-qr-image" src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || paymentQr.src} alt="Payment QR code for the event organizer" onLoad={() => onReady(true)} onError={() => { setQrError(true); onReady(false); }} />}
     </section>
     </>}
     {showEvidence && <>
@@ -57,7 +58,7 @@ export function QrPaymentFields({ transactionId, onTransactionId, proof, onProof
       <small>PNG, JPEG or WebP, maximum 5 MB.</small>
     </label>
     <FeedbackNotice message={error} icon="error" />
-    {proof && <div className="payment-proof-preview-wrap"><p className="payment-proof-caption">Screenshot attached</p><img className="payment-proof-preview" src={proof} alt="Preview of your payment screenshot" /></div>}
+    {proof && <div className="payment-proof-preview-wrap"><p className="payment-proof-caption">Screenshot attached</p><Image unoptimized width={320} height={320} className="payment-proof-preview" src={proof} alt="Preview of your payment screenshot" /></div>}
     </section>
     </>}
   </div>;

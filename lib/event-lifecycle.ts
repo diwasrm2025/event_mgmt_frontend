@@ -18,3 +18,8 @@ export function eventHasEnded(event: { date: string; time?: string | null }, now
 export function isCompletedEvent(event: { status: string; date: string; time?: string | null }, now = Date.now()): boolean {
   return event.status === 'completed' || eventHasEnded(event, now);
 }
+
+/** Latest additions come first; undated legacy records retain their relative order. */
+export function newestEventsFirst(a: { createdAt?: string }, b: { createdAt?: string }): number {
+  return (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0);
+}

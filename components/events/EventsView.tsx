@@ -37,10 +37,9 @@ import {
   getEventLink,
   getEventLinkAbsolute,
   removeEvent,
-  parseEventDate,
   type EventItem,
 } from "@/lib/events";
-import { isCompletedEvent } from "@/lib/event-lifecycle";
+import { isCompletedEvent, newestEventsFirst } from "@/lib/event-lifecycle";
 import { useEventClock } from "@/lib/use-event-clock";
 import { SharedMembersPanel } from "./SharedMembersPanel";
 import { getSession } from "@/lib/auth";
@@ -119,7 +118,7 @@ export function EventsView({ onToast, completed = false }: EventsViewProps) {
       })
       .filter((event) => !category || event.category === category)
       .filter((event) => !status || event.status === status)
-      .sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime());
+      .sort(newestEventsFirst);
   }, [events, query, category, status, completed, now]);
 
   const filtersActive = Boolean(query || category || status);

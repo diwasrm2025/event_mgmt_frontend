@@ -1,5 +1,7 @@
 "use client";
 
+import { isCompletedEvent, newestEventsFirst } from "@/lib/event-lifecycle";
+import { useEventClock } from "@/lib/use-event-clock";
 import { registrationClosed, formatRegistrationDeadline } from "@/lib/registration";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -21,8 +23,7 @@ const ASSET_ORIGIN = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/?$/
 const CATEGORIES: EventCategory[] = ["Music", "Conference", "Workshop", "Sports", "Festival", "Community"];
 
 export default function PublicEventsLandingPage() {
-  const [, tick] = useState(0);
-  useEffect(() => { const timer = window.setInterval(() => tick(n => n + 1), 1000); return () => window.clearInterval(timer); }, []);
+  const now = useEventClock();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -44,13 +45,13 @@ export default function PublicEventsLandingPage() {
   }, [search, category]);
 
   const sorted = useMemo(
-    () => [...events].sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime()),
-    [events],
+    () => events.filter((event) => !isCompletedEvent(event, now)).sort(newestEventsFirst),
+    [events, now],
   );
 
-  const totalEvents = events.length;
-  const freeEvents = events.filter((e) => e.eventType === "free").length;
-  const upcomingEvents = events.filter((e) => parseEventDate(e.date).getTime() > Date.now()).length;
+  const totalEvents = sorted.length;
+  const freeEvents = sorted.filter((e) => e.eventType === "free").length;
+  const upcomingEvents = sorted.length;
 
   return (
     <div className="public-shell">

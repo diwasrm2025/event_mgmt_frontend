@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { ProgressLoader } from "@/components/ui/ProgressLoader";
 import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 import { exportParticipants } from "@/lib/participant-export";
@@ -134,7 +135,7 @@ export function EventAttendeesView({ event }: { event: EventItem }) {
             {paymentProofLoading[booking.id] ? <p className="hint">Loading screenshot…</p> : paymentProofUrls[booking.id] ? <>
               {paymentProofErrors[booking.id] && <p className="form-msg show error" role="alert">{paymentProofErrors[booking.id]}</p>}
               <a href={paymentProofUrls[booking.id]} target="_blank" rel="noopener noreferrer" aria-label={`Open payment screenshot for ${booking.name} in a new tab`}>
-                <img className="roster-proof" src={paymentProofUrls[booking.id]} alt={`Payment screenshot for ${booking.name}`} onError={() => setPaymentProofErrors(current => ({ ...current, [booking.id]: "The screenshot preview could not be displayed. Use the link below to open the image directly." }))} />
+                <Image style={{ height: "auto" }} unoptimized width={320} height={480} className="roster-proof" src={paymentProofUrls[booking.id]} alt={`Payment screenshot for ${booking.name}`} onError={() => setPaymentProofErrors(current => ({ ...current, [booking.id]: "The screenshot preview could not be displayed. Use the link below to open the image directly." }))} />
               </a>
               <a className="btn btn-ghost btn-sm" href={paymentProofUrls[booking.id]} target="_blank" rel="noopener noreferrer">Open full screenshot in new tab</a>
             </> : paymentProofErrors[booking.id] ? <div><p className="form-msg show error" role="alert">{paymentProofErrors[booking.id]}</p><button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadPaymentProof(booking.id)}>Retry loading screenshot</button></div> : <p className="hint">The screenshot loads on demand to keep the attendee list fast.</p>}

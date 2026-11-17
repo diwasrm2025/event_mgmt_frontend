@@ -6647,7 +6647,7 @@ tbody td[colspan] {
 .attendee-table dd { margin: 4px 0 12px; color: var(--text-soft); }
 .roster-proof { display: block; max-width: 320px; width: 100%; max-height: 480px; object-fit: contain; margin: 12px 0; }
 .event-banner-slider { overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); margin-bottom: 24px; }
-.event-banner-slider > img { display: block; width: 100%; max-height: 480px; aspect-ratio: 16 / 9; object-fit: contain; background: var(--surface-soft); }
+.event-banner-slider > img { display: block; width: 100%; height: auto; max-height: 480px; aspect-ratio: 16 / 9; object-fit: contain; background: var(--surface-soft); }
 .event-banner-controls { display: flex; justify-content: space-between; gap: 12px; padding: 12px; align-items: center; color: var(--text); }
 .swal-modal.swal-dialog { margin: auto; transform: none; max-height: 90dvh; overflow: auto; }
 .swal-dialog::backdrop, .payment-notice::backdrop { background: rgb(15 23 42 / 65%); backdrop-filter: blur(4px); }
