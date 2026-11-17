@@ -151,14 +151,14 @@ export default function PublicEventsLandingPage() {
               <div
                 className="thumb"
                 style={{
-                  background: event.banners[0]
+                  background: (event.cardImage || event.banners[0])
                     ? undefined
                     : `linear-gradient(135deg, ${CATEGORY_COLORS[event.category] || "#8b5cf6"}44, ${CATEGORY_COLORS[event.category] || "#8b5cf6"}11)`,
                 }}
               >
-                {event.banners[0] ? (
+                {(event.cardImage || event.banners[0]) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={/^https?:\/\//i.test(event.banners[0]) ? event.banners[0] : `${ASSET_ORIGIN}${event.banners[0]}`} alt="" />
+                  <img src={/^https?:\/\//i.test((event.cardImage || event.banners[0])) ? (event.cardImage || event.banners[0]) : `${ASSET_ORIGIN}${(event.cardImage || event.banners[0])}`} alt="" />
                 ) : null}
                 <span className="badge">{event.category}</span>
                 {registrationClosed(event) || event.status === "completed" ? (<span className="registration-closed-text closed-card-badge">Registration closed</span>) : (

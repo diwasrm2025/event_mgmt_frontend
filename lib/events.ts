@@ -38,12 +38,14 @@ export interface EventItem {
   capacity: number;
   attendees: number;
   eventType: EventType;
+  allowOfflinePayment?: boolean;
   price: number;
   status: EventStatus;
   description: string;
   agenda: string[];
   host: string;
   featured: boolean;
+  cardImage?: string;
   banners: string[];
   wizardStep: number;
   fields?: EventFormFieldItem[];
@@ -90,12 +92,14 @@ export type EventPayload = Partial<{
   capacity: number;
   attendees: number;
   eventType: EventType;
+  allowOfflinePayment?: boolean;
   price: number;
   status: EventStatus;
   description: string;
   agenda: string[];
   host: string;
   featured: boolean;
+  cardImage?: string;
   banners: string[];
   wizardStep: number;
 }> & { title: string };
@@ -134,6 +138,16 @@ export async function updateEvent(id: string, data: Partial<EventPayload>): Prom
  * called, and (re)publishes on later calls. */
 export async function finalizeEvent(id: string, status?: EventStatus): Promise<EventItem> {
   return apiRequest<EventItem>(`/events/${id}/finalize`, { method: "POST", body: status ? { status } : {} });
+}
+
+export async function uploadEventCardImage(id: string, file: File): Promise<EventItem> {
+  const data = new FormData();
+  data.append("file", file);
+  return apiUpload<EventItem>(`/events/${id}/card-image`, data);
+}
+
+export async function removeEventCardImage(id: string): Promise<EventItem> {
+  return apiRequest<EventItem>(`/events/${id}/card-image`, { method: "DELETE" });
 }
 
 export async function uploadEventBanner(id: string, file: File): Promise<EventItem> {

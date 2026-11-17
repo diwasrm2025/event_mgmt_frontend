@@ -29,6 +29,8 @@ import {
   faClock,
   faGlobe,
   faLocationDot,
+  faQrcode,
+  faMoneyBillWave,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import { PublicTopBar } from "@/components/layout/PublicTopBar";
@@ -79,6 +81,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
   const [name, setName] = useState(session?.name ?? "");
   const [email, setEmail] = useState(session?.email ?? "");
   const [phone, setPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"qr" | "offline">("qr");
   const [transactionId, setTransactionId] = useState("");
   const [paymentProof, setPaymentProof] = useState("");
   const [qrReady, setQrReady] = useState(false);
@@ -113,6 +116,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
     setReceipt(null);
     setResponses({});
     setError("");
+    setPaymentMethod("qr");
     setPaymentProof("");
     setTransactionId("");
     setQrReady(Boolean(previewToken));
@@ -307,9 +311,8 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
           ...(isFree
             ? {}
             : {
-                paymentMethod: "qr" as const,
-                transactionId: transactionId.trim(),
-                paymentProof,
+                paymentMethod,
+                ...(paymentMethod === "qr" ? { transactionId: transactionId.trim(), paymentProof } : {}),
               }),
         };
       const result = previewToken
@@ -343,7 +346,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
 
   async function handlePay(e: FormEvent) {
     e.preventDefault();
-    if (!qrReady || !paymentProof || !/^[A-Za-z0-9-]{6,100}$/.test(transactionId.trim())) {
+    if (paymentMethod === "qr" && (!qrReady || !paymentProof || !/^[A-Za-z0-9-]{6,100}$/.test(transactionId.trim()))) {
       setError("Complete payment, enter a valid transaction ID, and attach your screenshot.");
       return;
     }
@@ -589,7 +592,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
                     <div className="payment-step-heading">
                       <p className="chart-kicker">{isTesting ? "ADMIN TEST MODE" : "SECURE YOUR REGISTRATION"}</p>
                       <h2>{isTesting ? "Test the payment review" : "Review and pay"}</h2>
-                      <p className="hint">{isTesting
+                      <p className="hint">{paymentMethod === "offline" ? "Pay the organizer offline. Registration remains pending until payment is confirmed." : isTesting
                         ? "Do not make a real payment. Use sample transaction details and an image to test the administrator review flow."
                         : "Pay the amount below, then enter your transaction reference and upload a screenshot so the organizer can verify it."}</p>
                     </div>
@@ -610,7 +613,30 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
                       </div>
                     </div>
 
-                    <QrPaymentFields transactionId={transactionId} onTransactionId={setTransactionId} proof={paymentProof} onProof={setPaymentProof} onReady={setQrReady} showQr={!isTesting} />
+                    {event.allowOfflinePayment && (
+                      <fieldset className="payment-mode-selector">
+                        <legend>Payment mode</legend>
+                        <div className="payment-mode-options">
+                          {([
+                            { value: "qr", label: "Pay by QR", description: "Scan QR & upload payment proof", icon: faQrcode },
+                            { value: "offline", label: "Pay Offline", description: "Pay directly to the organizer", icon: faMoneyBillWave },
+                          ] as const).map((mode) => (
+                            <button
+                              key={mode.value}
+                              type="button"
+                              className={`payment-mode-option${paymentMethod === mode.value ? " is-selected" : ""}`}
+                              aria-pressed={paymentMethod === mode.value}
+                              onClick={() => { setPaymentMethod(mode.value); setError(""); }}
+                            >
+                              <span className="payment-mode-icon"><FontAwesomeIcon icon={mode.icon} /></span>
+                              <span className="payment-mode-copy"><strong>{mode.label}</strong><span>{mode.description}</span></span>
+                              <FontAwesomeIcon className="payment-mode-check" icon={faCircleCheck} />
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                    )}
+                    {paymentMethod === "offline" ? <p className="payment-review-note">Arrange payment directly with the organizer. No screenshot or transaction reference is required.</p> : <QrPaymentFields transactionId={transactionId} onTransactionId={setTransactionId} proof={paymentProof} onProof={setPaymentProof} onReady={setQrReady} showQr={!isTesting} />}
                     <p className="payment-review-note">{isTesting
                       ? "This test submission is isolated from live attendance, payment processing, and email notifications."
                       : "After you submit, an administrator will review your payment. We'll email you when it's confirmed or if anything needs attention."}</p>
@@ -620,7 +646,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
                       type="submit"
                       disabled={submitting}
                     >
-                      Submit payment for review
+                      {paymentMethod === "offline" ? "Book with offline payment" : "Submit payment for review"}
                     </button>
 
                     <button
@@ -658,7 +684,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
                     <strong>
                       {isFree
                         ? "Completing your registration..."
-                        : "Submitting your payment screenshot..."}
+                        : paymentMethod === "offline" ? "Submitting your offline booking..." : "Submitting your payment screenshot..."}
                     </strong>
                   </div>
                 )}
@@ -694,7 +720,7 @@ export function PublicEventBooking({ slug, previewToken }: { slug: string; previ
           {notice.success && receipt ? (
             <>
               <p>
-                Your payment screenshot has been submitted for administrator review.
+                {receipt?.paymentMethod === "offline" ? "Your offline booking has been submitted. Please pay the organizer; registration remains pending until payment is confirmed." : "Your payment screenshot has been submitted for administrator review."}
               </p>
 
               <p>

@@ -67,6 +67,8 @@ import {
   updateEvent,
   updateEventField,
   uploadEventBanner,
+  uploadEventCardImage,
+  removeEventCardImage,
   type EventCategory,
   type EventMode,
   type EventType,
@@ -158,6 +160,7 @@ type InfoForm = {
   host: string;
   capacity: number;
   eventType: EventType;
+  allowOfflinePayment: boolean;
   price: number;
 };
 
@@ -234,6 +237,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
     host: "",
     capacity: 100,
     eventType: "free",
+    allowOfflinePayment: false,
     price: 0,
   });
   const [details, setDetails] = useState<DetailsForm>({ status: "published", featured: false, agenda: "" });
@@ -273,6 +277,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       host: loaded.host,
       capacity: loaded.capacity,
       eventType: evtType,
+      allowOfflinePayment: loaded.allowOfflinePayment ?? false,
       price: loaded.price,
     });
     setDetails({ status: !loaded.slug && loaded.status === "draft" ? "published" : loaded.status, featured: loaded.featured, agenda: loaded.agenda.join("\n") });
@@ -379,6 +384,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
         host: info.host.trim() || "Organizer",
         capacity: Number(info.capacity),
         eventType: info.eventType,
+        allowOfflinePayment: info.eventType === "paid" && info.allowOfflinePayment,
         price: info.eventType === "paid" ? Number(info.price) : 0,
         wizardStep: 2,
       });
@@ -420,6 +426,22 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
       setUploadingBanner(false);
     }
   };
+  const cardImageInputRef = useRef<HTMLInputElement>(null);
+  const handleCardImage = async (file?: File) => {
+    if (!event || uploadingBanner || saving) return;
+    if (file && (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      onToast("Choose a PNG, JPEG or WebP image no larger than 5 MB.");
+      return;
+    }
+    setUploadingBanner(true);
+    try {
+      const updated = file ? await uploadEventCardImage(event.id, file) : await removeEventCardImage(event.id);
+      setEvent(updated);
+      onToast(file ? "Card image saved." : "Card image removed.");
+    } catch (err) { onToast(err instanceof Error ? err.message : "Could not update card image."); }
+    finally { setUploadingBanner(false); }
+  };
+
   const handleBannerFile = (file: File | undefined | null) => void handleBannerFiles(file);
 
   const handleRemoveBanner = async (url: string) => {
@@ -862,6 +884,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                     </button>
                   </div>
 
+                  {info.eventType === "paid" && <div className="form-field"><label><input type="checkbox" checked={info.allowOfflinePayment} onChange={(e) => setInfo({ ...info, allowOfflinePayment: e.target.checked })} /> Allow offline payment</label><p className="hint">Offer Pay by QR and Pay Offline. Offline bookings remain pending until an administrator confirms payment.</p></div>}
                   {info.eventType === "paid" && (
                     <div className="field" style={{ marginTop: 12 }}>
                       <label htmlFor="w-price">
@@ -1106,7 +1129,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
             <div className="wizard-form-header">
               <div className="wizard-step-badge-pill">Step 2 of 5</div>
               <h3>Agenda, Details &amp; Media</h3>
-              <p className="hint">Set publication status, agenda, visibility, and upload your event cover &amp; banner images.</p>
+              <p className="hint">Set publication status, agenda, visibility, and upload your event card and banner images.</p>
             </div>
 
             {/* ── Publication Status ──────────────────── */}
@@ -1147,13 +1170,28 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
               </div>
             </div>
 
+            <div className="wizard-section">
+              <div className="wizard-section-title"><FontAwesomeIcon icon={faImage} /> Card Image</div>
+              <p className="hint">Choose one image for your event card in the event listing. A landscape image with a 16:9 ratio works best.</p>
+              <div className="event-card-image-upload">
+                {event.cardImage ? <Image unoptimized width={480} height={270} src={bannerSrc(event.cardImage)} alt="Event card preview" /> : <div className="event-card-image-placeholder"><FontAwesomeIcon icon={faImage} /><span>No card image selected</span></div>}
+                <div className="event-card-image-actions">
+                  <button type="button" className="btn btn-ghost" disabled={uploadingBanner || saving} onClick={() => cardImageInputRef.current?.click()}>
+                    {uploadingBanner ? "Uploading..." : event.cardImage ? "Replace card image" : "Upload card image"}
+                  </button>
+                  <input ref={cardImageInputRef} type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingBanner || saving} hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleCardImage(file); e.target.value = ""; }} />
+                  {event.cardImage && <button type="button" className="btn btn-ghost" disabled={uploadingBanner || saving} onClick={() => void handleCardImage()}>Remove</button>}
+                  <span className="hint">One image only ? PNG, JPEG or WebP ? up to 5 MB</span>
+                </div>
+              </div>
+            </div>
             {/* ── Cover & Banners ─────────────────────── */}
             <div className="wizard-section">
               <div className="wizard-section-title">
-                <FontAwesomeIcon icon={faImage} /> Cover &amp; Banner Images
+                <FontAwesomeIcon icon={faImage} /> Banner Images
               </div>
               <p className="hint" style={{ marginBottom: 12 }}>
-                Upload cover photos. The <strong>first image</strong> is used as the default slide. Click{" "}
+                Upload banners for the event details page. The <strong>first image</strong> is used as the default slide. Click{" "}
                 <strong>Set as Default</strong> on any thumbnail to make it the primary banner.
               </p>
 
@@ -1198,7 +1236,7 @@ export function EventWizard({ eventId, onToast }: EventWizardProps) {
                     void handleBannerFiles(e.dataTransfer.files);
                   }}
                   onClick={() => fileInputRef.current?.click()}
-                  title="Upload cover / banner image"
+                  title="Upload banner image"
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
