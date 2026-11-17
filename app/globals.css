@@ -6665,7 +6665,7 @@ tbody td[colspan] {
 .attendee-table dd { margin: 4px 0 12px; color: var(--text-soft); }
 .roster-proof { display: block; max-width: 320px; width: 100%; max-height: 480px; object-fit: contain; margin: 12px 0; }
 .event-banner-slider { overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); margin-bottom: 24px; }
-.event-banner-slider > img { display: block; width: 100%; height: auto; max-height: 480px; aspect-ratio: 16 / 9; object-fit: contain; background: var(--surface-soft); }
+.event-banner-slider > img { display: block; width: 100%; height: auto; max-height: 480px; object-fit: contain; background: var(--surface-soft); }
 .event-banner-controls { display: flex; justify-content: space-between; gap: 12px; padding: 12px; align-items: center; color: var(--text); }
 .swal-modal.swal-dialog { margin: auto; transform: none; max-height: 90dvh; overflow: auto; }
 .swal-dialog::backdrop, .payment-notice::backdrop { background: rgb(15 23 42 / 65%); backdrop-filter: blur(4px); }
@@ -6970,7 +6970,7 @@ textarea::placeholder {
 .experience-back { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 24px; color: var(--text-soft); text-decoration: none; font-size: 14px; }
 .experience-banner { overflow: hidden; border-radius: 28px; background: radial-gradient(ellipse at top right, rgba(var(--accent-rgb), .4), transparent), var(--surface); border: 1px solid rgba(var(--accent-rgb), .2); box-shadow: 0 24px 90px -54px var(--accent); }
 .event-experience .experience-banner .event-banner-slider { margin: 0; border: 0; border-radius: 0; }
-.event-experience .experience-banner .event-banner-slider > img { width: 100%; height: clamp(260px, 38vw, 500px); max-height: 420px; object-fit: cover; display: block; }
+.event-experience .experience-banner .event-banner-slider > img { width: 100%; max-height: 420px; object-fit: cover; display: block; }
 .experience-banner-fallback { min-height: 330px; display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: 48px; background-image: linear-gradient(120deg, transparent 45%, rgba(var(--accent-rgb), .15) 46%, transparent 70%); }
 .experience-banner-fallback span { color: var(--accent); letter-spacing: .15em; font-size: 12px; text-transform: uppercase; font-weight: 800; }
 .experience-banner-fallback strong { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 4.5rem); line-height: 1.06; max-width: 640px; }
