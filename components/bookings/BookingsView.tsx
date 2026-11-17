@@ -2,6 +2,8 @@
 import { EventStatusBadge } from "@/components/ui/EventStatusBadge";
 import { CrudEmptyRow } from "@/components/ui/CrudEmptyState";
 
+import { isCompletedEvent } from "@/lib/event-lifecycle";
+import { useEventClock } from "@/lib/use-event-clock";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CATEGORY_COLORS, formatCurrency, formatDateLabel, getAdminEventLink, parseEventDate, type EventItem } from "@/lib/events";
@@ -12,12 +14,16 @@ type BookingsViewProps = {
 };
 
 export function BookingsView({ events }: BookingsViewProps) {
+  const now = useEventClock();
+  const [completed, setCompleted] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
 
   const rows = useMemo(() => {
-    return [...events]
+    return events
+      .map((event) => isCompletedEvent(event, now) ? { ...event, status: "completed" as const } : event)
+      .filter((event) => (event.status === "completed") === completed)
       .filter((event) => {
         const haystack = `${event.title} ${event.venue} ${event.host}`.toLowerCase();
         return !query || haystack.includes(query.toLowerCase());
@@ -25,7 +31,7 @@ export function BookingsView({ events }: BookingsViewProps) {
       .filter((event) => !status || event.status === status)
       .filter((event) => !category || event.category === category)
       .sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime());
-  }, [events, query, status, category]);
+  }, [events, query, status, category, completed, now]);
 
   const totalBooked = rows.reduce((sum, event) => sum + event.attendees, 0);
   const totalCapacity = rows.reduce((sum, event) => sum + event.capacity, 0);
@@ -41,6 +47,15 @@ export function BookingsView({ events }: BookingsViewProps) {
 
   return (
     <div className="booking-grid">
+      <div className="settings-tabs" role="tablist" aria-label="Booking events" style={{ gridColumn: "1 / -1" }}>
+        {[false, true].map((value) => (
+          <button key={String(value)} type="button" role="tab" aria-selected={completed === value}
+            className={`settings-tab-btn ${completed === value ? "active" : ""}`}
+            onClick={() => { setCompleted(value); setStatus(""); }}>
+            {value ? "Completed Events" : "Events"}
+          </button>
+        ))}
+      </div>
       <div className="summary-card">
         <p className="panel-kicker">Booked seats</p>
         <strong>{totalBooked}</strong>
@@ -81,10 +96,12 @@ export function BookingsView({ events }: BookingsViewProps) {
             </select>
             <select className="select-filter" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">All statuses</option>
+              {completed ? <option value="completed">Completed</option> : <>
               <option value="published">Published</option>
               <option value="draft">Draft</option>
               <option value="testing">Testing</option>
               <option value="sold-out">Sold out</option>
+              </>}
             </select>
             {filtersActive ? (
               <button

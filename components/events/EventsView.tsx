@@ -40,10 +40,13 @@ import {
   parseEventDate,
   type EventItem,
 } from "@/lib/events";
+import { isCompletedEvent } from "@/lib/event-lifecycle";
+import { useEventClock } from "@/lib/use-event-clock";
 import { SharedMembersPanel } from "./SharedMembersPanel";
 import { getSession } from "@/lib/auth";
 
 type EventsViewProps = {
+  completed?: boolean;
   onToast: (message: string) => void;
 };
 
@@ -57,7 +60,7 @@ function formatTime12hr(time: string): string {
   return `${h}:${m} ${ampm}`;
 }
 
-export function EventsView({ onToast }: EventsViewProps) {
+export function EventsView({ onToast, completed = false }: EventsViewProps) {
   const router = useRouter();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +72,7 @@ export function EventsView({ onToast }: EventsViewProps) {
   const [qrDownloading, setQrDownloading] = useState<string | null>(null);
   const [shareEventTarget, setShareEventTarget] = useState<EventItem | null>(null);
 
+  const now = useEventClock();
   const session = useMemo(() => getSession(), []);
   const isSuperAdmin = session?.permissions?.includes("events:manage_all") ?? false;
 
@@ -106,7 +110,9 @@ export function EventsView({ onToast }: EventsViewProps) {
   }
 
   const filteredEvents = useMemo(() => {
-    return [...events]
+    return events
+      .map((event) => isCompletedEvent(event, now) ? { ...event, status: "completed" as const } : event)
+      .filter((event) => (event.status === "completed") === completed)
       .filter((event) => {
         const haystack = `${event.title} ${event.venue} ${event.host}`.toLowerCase();
         return !query || haystack.includes(query.toLowerCase());
@@ -114,7 +120,7 @@ export function EventsView({ onToast }: EventsViewProps) {
       .filter((event) => !category || event.category === category)
       .filter((event) => !status || event.status === status)
       .sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime());
-  }, [events, query, category, status]);
+  }, [events, query, category, status, completed, now]);
 
   const filtersActive = Boolean(query || category || status);
   const clearFilters = () => {
@@ -213,11 +219,12 @@ export function EventsView({ onToast }: EventsViewProps) {
           </select>
           <select className="select-filter" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All statuses</option>
+            {completed ? <option value="completed">Completed</option> : <>
             <option value="published">Published</option>
             <option value="draft">Draft</option>
             <option value="testing">Testing</option>
             <option value="sold-out">Sold Out</option>
-            <option value="completed">Completed</option>
+                        </>}
           </select>
           {filtersActive ? (
             <button type="button" className="filter-reset" onClick={clearFilters}>
@@ -264,7 +271,7 @@ export function EventsView({ onToast }: EventsViewProps) {
                 <button type="button" className="btn btn-ghost btn-sm" onClick={loadEvents}>Retry</button>
               </div></td></tr>
             ) : !filteredEvents.length ? (
-              <CrudEmptyRow name="Events" columns={8} />
+              <CrudEmptyRow name={completed ? "Completed Events" : "Events"} columns={8} />
             ) : (
               filteredEvents.map((event, idx) => {
                 const date = formatDateLabel(event.date);

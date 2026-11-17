@@ -1,5 +1,7 @@
 "use client";
 
+import { isCompletedEvent } from "@/lib/event-lifecycle";
+import { useEventClock } from "@/lib/use-event-clock";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
@@ -9,6 +11,7 @@ import {
   formatPercent,
   getAdminEventLink,
   getAnalyticsData,
+  getStats,
   parseEventDate,
   type ActivityItem,
   type EventItem,
@@ -69,12 +72,15 @@ type DashboardViewProps = {
 };
 
 export function DashboardView({ events, stats, activity, onToast }: DashboardViewProps) {
+  const now = useEventClock();
+  events = events.filter((event) => !isCompletedEvent(event, now));
+  stats = getStats(events);
   const analytics = getAnalyticsData(events);
   const months = analytics.months;
   const bookingMax = Math.max(...analytics.bookings, 1);
   const revenueMax = Math.max(...analytics.revenue, 1);
   const upcoming = [...events]
-    .filter((event) => parseEventDate(event.date) >= new Date())
+    .filter((event) => !isCompletedEvent(event, now))
     .sort((a, b) => parseEventDate(a.date).getTime() - parseEventDate(b.date).getTime())
     .slice(0, 5);
 

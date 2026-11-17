@@ -1,4 +1,5 @@
 "use client";
+import { isCompletedEvent } from "./event-lifecycle";
 
 import { apiRequest, apiUpload } from "./api";
 
@@ -359,7 +360,7 @@ export type Stats = {
 
 export function getStats(events: EventItem[]): Stats {
   const now = new Date();
-  const upcoming = events.filter((event) => parseEventDate(event.date) >= now).length;
+  const upcoming = events.filter((event) => !isCompletedEvent(event, now.getTime())).length;
   const bookedSeats = events.reduce((sum, event) => sum + (Number(event.attendees) || 0), 0);
   const capacity = events.reduce((sum, event) => sum + (Number(event.capacity) || 0), 0);
   const revenue = events.reduce((sum, event) => sum + (Number(event.attendees) || 0) * (Number(event.price) || 0), 0);

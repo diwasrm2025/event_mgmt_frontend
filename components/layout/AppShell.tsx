@@ -31,6 +31,7 @@ import {
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { isCompletedEvent } from "@/lib/event-lifecycle";
 import { allEvents } from "@/lib/events";
 
 function TopbarClock() {
@@ -101,6 +102,7 @@ type AppShellProps = {
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/dashboard/events", label: "Events", icon: "ticket" },
+  { href: "/dashboard/completed-events", label: "Completed Events", icon: "completed" },
   { href: "/bookings", label: "Bookings", icon: "users" },
   { href: "/analytics", label: "Analytics", icon: "chart" },
   { href: "/dashboard/qr", label: "Generate QR", icon: "qr" },
@@ -117,6 +119,7 @@ function formatRoleName(role?: string) {
 
 function NavIcon({ name }: { name: string }) {
   switch (name) {
+    case "completed": return <FontAwesomeIcon icon={faCalendarCheck} />;
     case "qr": return <FontAwesomeIcon icon={faQrcode} />;
     case "ticket":
       return <FontAwesomeIcon icon={faTicket} />;
@@ -163,7 +166,7 @@ export function AppShell({
   useEffect(() => {
     allEvents().then((events) => {
       const now = new Date();
-      const upcoming = events.filter((e) => e.status === "published" && new Date(e.date + "T00:00:00") >= now);
+      const upcoming = events.filter((e) => (e.status === "published" || e.status === "sold-out") && !isCompletedEvent(e, now.getTime()));
       setUpcomingCount(upcoming.length);
       const rev = events.reduce((sum, e) => sum + e.attendees * e.price, 0);
       setTotalRevenue(rev);
