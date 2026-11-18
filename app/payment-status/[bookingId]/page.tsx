@@ -7,6 +7,21 @@ import { PublicTopBar } from "@/components/layout/PublicTopBar";
 import { PAYMENT_STATUS_LABELS } from "@/lib/events";
 import { getPaymentReview, type PaymentReview } from "@/lib/payment-status";
 
+function getStatusMessage(review: PaymentReview, approved: boolean, offlineAccepted: boolean, rejected: boolean) {
+  if (review.isTest) return "This test registration is isolated from live attendance and no email was sent.";
+  if (offlineAccepted) return "The organizer accepted your offline payment. It will show as completed after they mark it paid; check-in will be enabled then.";
+  if (approved) {
+    if (review.paymentMethod === "offline") return "Your offline payment has been marked paid. Your registration is confirmed and check-in is enabled.";
+    if (review.paymentMethod === "qr") return "Thank you for registering! Your UPI payment has been verified. Your registration confirmation will be sent by email.";
+    return "Your registration is confirmed.";
+  }
+  if (rejected) return "Your payment was rejected. Please review the reason below or contact the event organizer.";
+  if (review.paymentStatus === "paid") return review.rejectionReason || "Payment received. Please contact the organizer to resolve your registration.";
+  if (review.paymentMethod === "offline") return "Your offline payment is awaiting confirmation from the organizer. Check-in will be enabled after your payment is accepted.";
+  if (review.paymentMethod === "qr") return "Your UPI payment is awaiting verification. Registration will be confirmed once the payment is verified.";
+  return "Your payment is awaiting verification.";
+}
+
 export default function PaymentStatusPage({ params }: { params: { bookingId: string } }) {
   const router = useRouter();
   const [review, setReview] = useState<PaymentReview | null>(null);
@@ -27,12 +42,15 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
     void refresh();
   }, [refresh]);
   const approved = review?.paymentStatus === "paid" && review?.registrationStatus === "approved";
+  const offlineAccepted = review?.paymentMethod === "offline" && review?.paymentStatus === "pending" && review?.registrationStatus === "approved";
   const rejected = review?.registrationStatus === "rejected" || review?.paymentStatus === "failed";
+  const resolved = approved || rejected;
+  const statusMessage = review ? getStatusMessage(review, approved, offlineAccepted, rejected) : "";
   useEffect(() => {
-    if (approved || rejected) return;
+    if (resolved) return;
     const timer = window.setInterval(() => void refresh(), 10000);
     return () => window.clearInterval(timer);
-  }, [approved, rejected, refresh]);
+  }, [resolved, refresh]);
   useEffect(() => {
     if (!approved || review?.isTest) {
       setCountdown(null);
@@ -60,12 +78,13 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
       <h1>Payment status</h1>
       <p className="hint">Bookmark this private link to check your payment review at any time.</p>
       <FeedbackNotice message={error} icon="error" />
-      <div aria-live="polite" className={review ? `payment-review-banner ${approved ? "is-completed" : rejected ? "is-rejected" : "is-pending"}` : undefined}>
+      <div aria-live="polite" className={review ? `payment-review-banner ${approved || offlineAccepted ? "is-completed" : rejected ? "is-rejected" : "is-pending"}` : undefined}>
         {!review && loading && <p>Checking your payment…</p>}
         {review && <>
-          <h2>{rejected ? "Payment Rejected" : PAYMENT_STATUS_LABELS[review.paymentStatus]}</h2>
-          {approved && <p><strong>Your UPI payment has been confirmed.</strong></p>}
-          <p>{review.isTest ? "This test registration is isolated from live attendance and no email was sent." : approved ? "Thank you for registering! Your UPI payment has been verified. Your registration confirmation will be sent by email." : rejected ? "Your payment was rejected. Please review the reason below or contact the event organizer." : review.paymentStatus === "paid" ? review.rejectionReason || "Payment received. Please contact the organizer to resolve your registration." : "Your UPI payment is awaiting verification. Registration will be confirmed once the payment is verified."}</p>
+          <h2>{offlineAccepted ? "Payment Accepted" : rejected ? "Payment Rejected" : PAYMENT_STATUS_LABELS[review.paymentStatus]}</h2>
+          {offlineAccepted && <p><strong>Your offline payment has been accepted.</strong></p>}
+          {approved && review.paymentMethod === "qr" && <p><strong>Your UPI payment has been confirmed.</strong></p>}
+          <p>{statusMessage}</p>
           {rejected && <p><strong>Reason: </strong>{review.rejectionReason || "Please contact the organizer for further details."}</p>}
           {approved && review.paidAt && <p className="hint">Completed on {new Date(review.paidAt).toLocaleString()}</p>}
           {approved && !review.isTest && countdown !== null && <div className="payment-completion-timer" role="status" aria-live="polite">
@@ -77,8 +96,8 @@ export default function PaymentStatusPage({ params }: { params: { bookingId: str
           </div>}
         </>}
       </div>
-      {!approved && !rejected && <button className="btn btn-vibrant" type="button" disabled={loading} onClick={() => void refresh()}>{loading ? "Checking…" : "Refresh status"}</button>}
-      {!approved && !rejected && <p className="hint">Status updates automatically every 10 seconds.</p>}
+      {!resolved && <button className="btn btn-vibrant" type="button" disabled={loading} onClick={() => void refresh()}>{loading ? "Checking…" : "Refresh status"}</button>}
+      {!resolved && <p className="hint">Status updates automatically every 10 seconds.</p>}
     </section>
   </main>
   </>;

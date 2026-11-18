@@ -198,6 +198,14 @@ export function updateRegistrationStatus(eventId: string, bookingId: string, sta
   return apiRequest<Pick<import("./events").BookingItem, "id" | "paymentStatus" | "registrationStatus" | "rejectionReason" | "paidAt" | "status">>(`/bookings/event/${eventId}/${bookingId}/registration-status`, { method: "PATCH", body: { status, reason } });
 }
 
+export function acceptOfflinePayment(eventId: string, bookingId: string) {
+  return apiRequest<Pick<import("./events").BookingItem, "id" | "paymentStatus" | "registrationStatus" | "rejectionReason" | "paidAt" | "status">>(`/bookings/event/${eventId}/${bookingId}/accept-offline`, { method: "PATCH" });
+}
+
+export function markOfflinePaymentPaid(eventId: string, bookingId: string) {
+  return apiRequest<Pick<import("./events").BookingItem, "id" | "paymentStatus" | "registrationStatus" | "paidAt" | "status">>(`/bookings/event/${eventId}/${bookingId}/mark-paid`, { method: "PATCH" });
+}
+
 // --- Notifications ---------------------------------------------------------
 export type AppNotification = {
   id: string;

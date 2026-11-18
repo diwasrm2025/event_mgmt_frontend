@@ -100,7 +100,7 @@ export function DataTablePagination<T>({
           </div>
         ) : <div />}
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+        {pageSizeOptions.length > 1 && <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
           <span className="hint">Rows per page:</span>
           <select
             value={pageSize}
@@ -117,7 +117,7 @@ export function DataTablePagination<T>({
               </option>
             ))}
           </select>
-        </div>
+        </div>}
       </div>
 
       {/* Render Table Content */}

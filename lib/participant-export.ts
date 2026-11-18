@@ -1,4 +1,37 @@
 import type { EventItem, RosterBooking, RosterAccess } from "./events";
+
+const paymentStatusLabels = {
+ pending: "Payment Pending",
+ paid: "Payment Completed",
+ failed: "Payment Failed",
+ refunded: "Payment Refunded",
+} as const;
+
+const paymentMethodLabels = {
+ qr: "QR payment",
+ offline: "Pay offline",
+ free: "Free",
+ sbiepay: "UPI Payment (₹)",
+} as const;
+
+const bookingStatusLabels = {
+ pending: "Pending",
+ confirmed: "Confirmed",
+ cancelled: "Cancelled",
+} as const;
+
+const registrationStatusLabels = {
+ pending: "Pending",
+ approved: "Approved",
+ rejected: "Rejected",
+} as const;
+
+function paymentStatusLabel(booking: RosterBooking) {
+ if (booking.paymentMethod === "offline" && booking.paymentStatus === "pending" && booking.registrationStatus === "approved") return "Payment Accepted";
+ if (booking.registrationStatus === "rejected") return "Payment Rejected";
+ return paymentStatusLabels[booking.paymentStatus];
+}
+
 export async function exportParticipants(event: EventItem, bookings: RosterBooking[], access: RosterAccess) {
  const { Workbook } = await import("exceljs");
  const workbook = new Workbook(); const sheet = workbook.addWorksheet("Participants");
@@ -9,21 +42,21 @@ export async function exportParticipants(event: EventItem, bookings: RosterBooki
  { label: "Full Name", value: b => b.name },
  { label: "Email Address", value: b => b.email },
  { label: "Phone Number", value: b => b.phone },
- { label: "Booking status", value: b => b.status },
+ { label: "Booking status", value: b => bookingStatusLabels[b.status] },
  { label: "Record type", value: b => b.isTest ? "TEST" : "LIVE" },
  { label: "Booking ID", value: b => b.id },
  ...fields.map(field => ({ label: field.label, value: (b: RosterBooking) => b.responses?.[field.name] })),
- { label: "Registration status", value: b => b.registrationStatus === "approved" && b.status === "confirmed" ? "Completed" : "Pending" },
+ { label: "Registration status", value: b => registrationStatusLabels[b.registrationStatus] },
  { label: "Registered at", value: b => b.createdAt },
  ...(event.eventType === "paid" ? [
  { label: "Amount", value: (b: RosterBooking) => b.amount },
- { label: "Payment method", value: (b: RosterBooking) => b.paymentMethod },
- { label: "Payment status", value: (b: RosterBooking) => b.paymentStatus },
- { label: "paidAt", value: (b: RosterBooking) => access.canApprovePayment ? b.paidAt : undefined },
- { label: "transactionId", value: (b: RosterBooking) => access.canApprovePayment ? b.transactionId : undefined },
+ { label: "Payment method", value: (b: RosterBooking) => paymentMethodLabels[b.paymentMethod] },
+ { label: "Payment status", value: (b: RosterBooking) => paymentStatusLabel(b) },
+ { label: "Paid at", value: (b: RosterBooking) => access.canApprovePayment ? b.paidAt : undefined },
+ { label: "Transaction ID", value: (b: RosterBooking) => access.canApprovePayment ? b.transactionId : undefined },
  ] : []),
- { label: "checkedIn", value: b => b.checkedIn },
- { label: "checkedInAt", value: b => b.checkedInAt },
+ { label: "Checked in", value: b => b.checkedIn },
+ { label: "Checked in at", value: b => b.checkedInAt },
  ];
  sheet.addRow(columns.map(c => c.label));
  bookings.forEach((booking, index) => sheet.addRow(columns.map(c => { const v = c.value(booking, index); return v == null ? "" : typeof v === "boolean" ? (v ? "Yes" : "No") : typeof v === "object" ? JSON.stringify(v) : v; })));

@@ -13,17 +13,23 @@ for (const eventType of ['free', 'paid']) test(eventType + ' export matches exac
  let blob; const oldDocument = global.document; const oldCreate = URL.createObjectURL;
  URL.createObjectURL = value => { blob = value; return 'blob:test'; }; global.document = { createElement: () => ({ click() {} }) };
  try {
-  const bookings = Array.from({ length: 10 }, (_, i) => ({ id: String(i), name: 'Person ' + i, email: 'a@example.com', phone: '1234567890', responses: { old_key: i === 0 ? '=1+1' : 'Answer ' + i, consent: i === 0, removed: 'Exclude this' }, createdAt: '2026-10-23', status: i === 1 ? 'pending' : 'confirmed', registrationStatus: i === 1 ? 'pending' : 'approved', paymentStatus: 'paid', paymentMethod: eventType === 'free' ? 'free' : 'sbiepay', seats: 1, amount: 100, paidAt: '2026-10-23', transactionId: 'TX1', isTest: i === 0, checkedIn: i === 0, checkedInAt: i === 0 ? '2026-10-23' : null }));
+  const bookings = Array.from({ length: 10 }, (_, i) => ({ id: String(i), name: 'Person ' + i, email: 'a@example.com', phone: '1234567890', responses: { old_key: i === 0 ? '=1+1' : 'Answer ' + i, consent: i === 0, removed: 'Exclude this' }, createdAt: '2026-10-23', status: i === 1 || i === 5 ? 'pending' : 'confirmed', registrationStatus: i === 1 ? 'pending' : i === 5 ? 'rejected' : 'approved', paymentStatus: eventType === 'paid' && (i === 1 || i === 4 || i === 5) ? i === 5 ? 'failed' : 'pending' : 'paid', paymentMethod: eventType === 'free' ? 'free' : i === 4 || i === 5 ? 'offline' : 'sbiepay', seats: 1, amount: 100, paidAt: '2026-10-23', transactionId: 'TX1', isTest: i === 0, checkedIn: i === 0, checkedInAt: i === 0 ? '2026-10-23' : null }));
   await exportParticipants({ title: 'Event', slug: 'event', eventType, fields: [{ name: 'old_key', label: 'Renamed frontend question', order: 0, type: 'text' }, { name: 'consent', label: 'Consent', order: 1, type: 'checkbox' }] }, bookings, { canApprovePayment: true, canCheckIn: true });
   const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(await blob.arrayBuffer()); const sheet = workbook.worksheets[0];
-  const headers = [...commonHeaders, ...(eventType === 'paid' ? ['Amount', 'Payment method', 'Payment status', 'paidAt', 'transactionId'] : []), 'checkedIn', 'checkedInAt'];
+  const headers = [...commonHeaders, ...(eventType === 'paid' ? ['Amount', 'Payment method', 'Payment status', 'Paid at', 'Transaction ID'] : []), 'Checked in', 'Checked in at'];
   assert.deepEqual(sheet.getRow(1).values.slice(1), headers); assert.equal(sheet.rowCount, 11);
   const cell = (row, label) => sheet.getRow(row).getCell(headers.indexOf(label) + 1).value;
   assert.equal(cell(2, 'S.No'), 1); assert.equal(cell(11, 'S.No'), 10);
   assert.equal(cell(2, 'Record type'), 'TEST'); assert.equal(cell(3, 'Record type'), 'LIVE');
   assert.equal(cell(2, 'Renamed frontend question'), '=1+1'); assert.equal(cell(11, 'Renamed frontend question'), 'Answer 9');
-  assert.equal(cell(2, 'Registration status'), 'Completed'); assert.equal(cell(3, 'Registration status'), 'Pending');
-  assert.equal(cell(2, 'checkedIn'), 'Yes'); assert.equal(cell(3, 'checkedIn'), 'No');
+  assert.equal(cell(2, 'Registration status'), 'Approved'); assert.equal(cell(3, 'Registration status'), 'Pending');
+  if (eventType === 'paid') {
+   assert.equal(cell(2, 'Payment status'), 'Payment Completed');
+   assert.equal(cell(3, 'Payment status'), 'Payment Pending');
+   assert.equal(cell(6, 'Payment status'), 'Payment Accepted');
+   assert.equal(cell(7, 'Payment status'), 'Payment Rejected');
+  }
+  assert.equal(cell(2, 'Checked in'), 'Yes'); assert.equal(cell(3, 'Checked in'), 'No');
   assert.equal(cell(2, 'Consent'), 'Yes'); assert.equal(cell(3, 'Consent'), 'No');
  } finally { global.document = oldDocument; URL.createObjectURL = oldCreate; }
 });

@@ -1455,6 +1455,10 @@ html, body {
   color: var(--success);
   background: var(--success-tint);
 }
+.pay-badge.accepted {
+  color: var(--success);
+  background: var(--success-tint);
+}
 .pay-badge.pending {
   color: var(--warning);
   background: var(--warning-tint);
@@ -6656,6 +6660,11 @@ tbody td[colspan] {
 .roster-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
 .roster-page .toolbar input { flex: 1 1 280px; }
 .roster-page .toolbar input, .roster-page .toolbar select { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
+.roster-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding:14px; border-bottom: 1px solid var(--border); }
+.roster-tabs button { display: inline-flex; gap: 8px; align-items: center; padding: 9px 13px; color: var(--text-soft); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+.roster-tabs button.active { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+.roster-tabs button span { min-width: 22px; padding: 2px 6px; color: var(--text); background: var(--surface-soft); border-radius: 999px; text-align: center; font-size: 12px; }
+.roster-tabs-divider { align-self: stretch; width: 1px; margin: 0 4px; background: var(--border); }
 .attendee-table { width: 100%; min-width: 760px; }
 .attendee-table th, .attendee-table td { padding: 16px 18px; vertical-align: top; }
 .attendee-table th { background: var(--surface-soft); }
